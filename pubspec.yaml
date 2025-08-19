@@ -1,0 +1,38 @@
+name: sushiroll_express
+description: A new Flutter project.
+version: 1.0.0+1
+environment: 
+  sdk: ^3.6.0
+dependencies: 
+  flutter: 
+    sdk: flutter
+  cached_network_image: ^3.3.1
+  flutter_svg: ^2.0.9
+  shared_preferences: ^2.2.2
+  connectivity_plus: ^5.0.2
+  dio: ^5.4.0
+  fluttertoast: ^8.2.4
+  sizer: ^2.0.15
+  fl_chart: ^0.65.0
+  google_fonts: ^6.1.0
+  http: ^1.1.0
+  provider: ^6.1.1
+  csv: ^5.0.2
+  path: ^1.8.3
+  excel: ^4.0.6
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0
+  sqflite_common_ffi_web: ^0.4.2
+  crypto: ^3.0.3
+  web: any
+dev_dependencies: 
+  flutter_test: 
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter: 
+  uses-material-design: true
+  assets: 
+    - assets/
+    - assets/images/
+    - assets/data/
+    - assets/data/users.json

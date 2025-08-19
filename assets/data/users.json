@@ -1,0 +1,15 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Test User",
+      "email": "test@test.com",
+      "phone": "1234567890",
+      "password_hash": "test_hash_123",
+      "created_at": "2024-01-01T00:00:00.000Z",
+      "loyalty_points": 100,
+      "is_active": true,
+      "last_login_at": null
+    }
+  ]
+}
