@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class OrderSummaryWidget extends StatelessWidget {
-  const OrderSummaryWidget({super.key});
+  final double totalPrice;
+  final int totalItems;
+
+  const OrderSummaryWidget({
+    super.key,
+    required this.totalPrice,
+    required this.totalItems,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +18,7 @@ class OrderSummaryWidget extends StatelessWidget {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -25,8 +32,8 @@ class OrderSummaryWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Стоимость товаров:'),
-              Text('850 ₽'),
+              Text('Стоимость товаров (${totalItems} шт.):'),
+              Text('${totalPrice.toStringAsFixed(2)} ₽'),
             ],
           ),
           SizedBox(height: 8),
@@ -57,7 +64,7 @@ class OrderSummaryWidget extends StatelessWidget {
                 ),
               ),
               Text(
-                '1000 ₽',
+                '${totalPrice.toStringAsFixed(2)} ₽',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

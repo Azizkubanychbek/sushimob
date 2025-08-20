@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../models/app_roll.dart';
+import '../../../services/cart_service.dart';
+import '../../../services/favorites_service.dart';
 
 class SushiCardWidget extends StatelessWidget {
   final AppRoll roll;
-  
+
   const SushiCardWidget({
     super.key,
     required this.roll,
@@ -11,6 +13,8 @@ class SushiCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final favoritesService = FavoritesService();
+    final cartService = CartService();
     return GestureDetector(
       onTap: () {
         Navigator.pushNamed(
@@ -85,7 +89,7 @@ class SushiCardWidget extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 8), // Небольшой отступ вместо Spacer
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -96,20 +100,73 @@ class SushiCardWidget extends StatelessWidget {
                             color: Colors.green,
                           ),
                         ),
-                        IconButton(
-                          onPressed: () {
-                            // TODO: Добавить в корзину
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('${roll.name} добавлен в корзину'),
-                                duration: const Duration(seconds: 1),
+                        Row(
+                          children: [
+                            // Кнопка "Добавить в избранное"
+                            IconButton(
+                              onPressed: () async {
+                                final favoritesService = FavoritesService();
+                                final success = await favoritesService.toggleFavorite(
+                                  itemType: 'roll',
+                                  itemId: roll.id,
+                                );
+                                
+                                if (success) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${roll.name} ${favoritesService.isInFavorites('roll', roll.id) ? 'добавлен в' : 'удален из'} избранного'),
+                                      backgroundColor: Colors.green,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: Icon(
+                                favoritesService.isInFavorites('roll', roll.id) 
+                                    ? Icons.favorite 
+                                    : Icons.favorite_border,
+                                color: favoritesService.isInFavorites('roll', roll.id) 
+                                    ? Colors.red 
+                                    : Colors.grey,
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.add_circle),
-                          iconSize: 20,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
+                              iconSize: 20,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            // Кнопка "Добавить в корзину" (корзинка вместо плюсика)
+                            IconButton(
+                              onPressed: () async {
+                                final cartService = CartService();
+                                final success = await cartService.addToCart(
+                                  itemType: 'roll',
+                                  itemId: roll.id,
+                                  quantity: 1,
+                                );
+                                
+                                if (success) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${roll.name} добавлен в корзину'),
+                                      backgroundColor: Colors.green,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Ошибка добавления в корзину'),
+                                      backgroundColor: Colors.red,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.shopping_cart),
+                              iconSize: 20,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
                         ),
                       ],
                     ),

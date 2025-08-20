@@ -68,7 +68,7 @@ class _SetsBrowseScreenState extends State<SetsBrowseScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2, // Сеты
+        currentIndex: 2, // Избранное
         onTap: (index) {
           switch (index) {
             case 0:
@@ -78,7 +78,7 @@ class _SetsBrowseScreenState extends State<SetsBrowseScreen> {
               Navigator.pushReplacementNamed(context, '/menu-browse-screen');
               break;
             case 2:
-              // Already on sets
+              // Already on favorites
               break;
             case 3:
               Navigator.pushReplacementNamed(context, '/shopping-cart-screen');
@@ -99,8 +99,8 @@ class _SetsBrowseScreenState extends State<SetsBrowseScreen> {
             label: 'Menu',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.set_meal),
-            label: 'Sets',
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),

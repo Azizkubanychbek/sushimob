@@ -41,13 +41,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        print('✅ Вход успешен! Переходим на главную страницу...');
+        print('📱 Пользователь: ${result.user?.name} (${result.user?.email})');
+        print('🔑 Токен: ${result.sessionToken?.substring(0, 20)}...');
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result.message ?? 'Вход выполнен успешно!'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pushReplacementNamed(context, '/');
+        // Переходим на главную страницу после успешного входа
+        if (mounted) {
+          print('🚀 Навигация на /home-screen после входа...');
+          Navigator.pushNamedAndRemoveUntil(
+            context, 
+            '/home-screen', 
+            (route) => false
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

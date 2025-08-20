@@ -398,6 +398,6 @@ class WebAuthService {
       );
     }
 
-    return AuthResult(success: true);
+    return AuthResult(success: true, message: 'Данные корректны'); // Added missing message parameter
   }
 }

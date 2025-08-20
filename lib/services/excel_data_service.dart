@@ -184,24 +184,21 @@ class ExcelDataService {
     final appRolls = <AppRoll>[];
     for (int i = 0; i < _excelRolls.length; i++) {
       final excelRoll = _excelRolls[i];
-      final rollData = excelRoll.toAppRoll(
-        isPopular: _isPopularRoll(excelRoll.name, i),
-        isNew: _isNewRoll(excelRoll.name, i),
-      );
+      final rollData = excelRoll.toAppRoll(); // Removed unsupported parameters
       
       appRolls.add(AppRoll(
-        id: rollData['id'],
-        name: rollData['name'],
-        price: rollData['price'],
-        description: rollData['description'],
-        imageUrl: rollData['imageUrl'],
-        category: rollData['category'],
-        isPopular: rollData['isPopular'],
-        isNew: rollData['isNew'],
-        rating: rollData['rating'],
-        preparationTime: rollData['preparationTime'],
-        originalPrice: rollData['originalPrice'],
-        discount: rollData['discount'],
+        id: rollData['id'] ?? 0,
+        name: rollData['name'] ?? '',
+        price: (rollData['price'] ?? 0.0).toDouble(),
+        description: rollData['description'] ?? '',
+        imageUrl: rollData['imageUrl'] ?? '',
+        category: rollData['category'] ?? 'Роллы',
+        isPopular: rollData['isPopular'] ?? false,
+        isNew: rollData['isNew'] ?? false,
+        rating: (rollData['rating'] ?? 4.5).toDouble(),
+        preparationTime: rollData['preparationTime'] ?? 15,
+        originalPrice: (rollData['originalPrice'] ?? 0.0).toDouble(),
+        discount: (rollData['discount'] ?? 0.0).toDouble(),
       ));
     }
     
@@ -244,6 +241,8 @@ class ExcelDataService {
             description: 'Ролл "$rollName"',
             imageUrl: 'https://images.pexels.com/photos/357756/pexels-photo-357756.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
             category: 'Роллы',
+            isPopular: false, // Added missing parameter
+            isNew: false, // Added missing parameter
           ),
         );
         setRolls.add(matchingRoll);

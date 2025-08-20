@@ -1,24 +1,20 @@
 import 'roll.dart';
 import 'set.dart';
 
-class CartItem {
+class FavoriteItem {
   final int id;
   final String itemType; // 'roll' или 'set'
   final dynamic item; // Roll или Set
-  final int quantity;
   final String addedAt;
-  final double price; // Added price field
 
-  CartItem({
+  FavoriteItem({
     required this.id,
     required this.itemType,
     required this.item,
-    required this.quantity,
     required this.addedAt,
-    required this.price, // Added price parameter
   });
 
-  factory CartItem.fromJson(Map<String, dynamic> json) {
+  factory FavoriteItem.fromJson(Map<String, dynamic> json) {
     dynamic item;
     if (json['item_type'] == 'roll') {
       item = Roll.fromJson(json['item']);
@@ -26,13 +22,11 @@ class CartItem {
       item = Set.fromJson(json['item']);
     }
 
-    return CartItem(
+    return FavoriteItem(
       id: json['id']?.toInt() ?? 0,
       itemType: json['item_type'] ?? '',
       item: item,
-      quantity: json['quantity']?.toInt() ?? 0,
       addedAt: json['added_at'] ?? '',
-      price: (json['price'] ?? 0.0).toDouble(), // Parse price from API
     );
   }
 
@@ -41,9 +35,7 @@ class CartItem {
       'id': id,
       'item_type': itemType,
       'item': item.toJson(),
-      'quantity': quantity,
       'added_at': addedAt,
-      'price': price, // Include price in JSON
     };
   }
 
@@ -56,8 +48,27 @@ class CartItem {
     return '';
   }
 
+  double get price {
+    if (item is Roll) {
+      return (item as Roll).salePrice;
+    } else if (item is Set) {
+      return (item as Set).setPrice;
+    }
+    return 0.0;
+  }
+
+  String get imageUrl {
+    // Используем заглушки для изображений, так как в моделях Roll и Set нет imageUrl
+    if (item is Roll) {
+      return 'https://images.pexels.com/photos/2098085/pexels-photo-2098085.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1';
+    } else if (item is Set) {
+      return 'https://images.pexels.com/photos/2098085/pexels-photo-2098085.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1';
+    }
+    return '';
+  }
+
   @override
   String toString() {
-    return 'CartItem(id: $id, itemType: $itemType, itemName: $itemName, quantity: $quantity, price: $price)';
+    return 'FavoriteItem(id: $id, itemType: $itemType, itemName: $itemName)';
   }
 }

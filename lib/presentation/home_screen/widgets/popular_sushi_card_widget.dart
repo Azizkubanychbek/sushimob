@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/favorites_service.dart';
 
-class PopularSushiCardWidget extends StatelessWidget {
+class PopularSushiCardWidget extends StatefulWidget {
   final Map<String, dynamic>? sushi;
   final VoidCallback onAddToCart;
   final VoidCallback onLongPress;
@@ -18,9 +19,23 @@ class PopularSushiCardWidget extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<PopularSushiCardWidget> createState() => _PopularSushiCardWidgetState();
+}
+
+class _PopularSushiCardWidgetState extends State<PopularSushiCardWidget> {
+  bool isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Инициализируем состояние избранного из данных
+    isFavorite = widget.sushi?["isFavorite"] as bool? ?? false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Защита от null значений
-    if (sushi == null) {
+    if (widget.sushi == null) {
       return Container(
         width: 45.w,
         height: 20.h,
@@ -36,17 +51,17 @@ class PopularSushiCardWidget extends StatelessWidget {
     }
 
     // Безопасное извлечение значений с проверкой на null
-    final imageUrl = sushi!["image"]?.toString() ?? '';
-    final name = sushi!["name"]?.toString() ?? 'Название';
-    final price = sushi!["price"]?.toString() ?? '0₽';
-    final rating = sushi!["rating"]?.toString() ?? '0.0';
-    final isFavorite = sushi!["isFavorite"] as bool? ?? false;
-    final isNew = sushi!["isNew"] as bool? ?? false;
-    final isPopular = sushi!["isPopular"] as bool? ?? false;
+    final imageUrl = widget.sushi!["image"]?.toString() ?? '';
+    final name = widget.sushi!["name"]?.toString() ?? 'Название';
+    final price = widget.sushi!["price"]?.toString() ?? '0₽';
+    final rating = widget.sushi!["rating"]?.toString() ?? '0.0';
+
+    final isNew = widget.sushi!["isNew"] as bool? ?? false;
+    final isPopular = widget.sushi!["isPopular"] as bool? ?? false;
 
     return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: Container(
         width: 45.w,
         margin: EdgeInsets.only(right: 4.w),
@@ -82,8 +97,19 @@ class PopularSushiCardWidget extends StatelessWidget {
                   top: 2.w,
                   right: 2.w,
                   child: GestureDetector(
-                    onTap: () {
-                      // Toggle favorite functionality
+                    onTap: () async {
+                      final favoritesService = FavoritesService();
+                      final success = await favoritesService.toggleFavorite(
+                        itemType: 'roll',
+                        itemId: widget.sushi!['id'] ?? 0,
+                      );
+                      
+                      if (success) {
+                        // Обновляем состояние избранного
+                        setState(() {
+                          isFavorite = !isFavorite;
+                        });
+                      }
                     },
                     child: Container(
                       padding: EdgeInsets.all(1.w),
@@ -91,10 +117,10 @@ class PopularSushiCardWidget extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.9),
                         shape: BoxShape.circle,
                       ),
-                      child: CustomIconWidget(
-                        iconName: isFavorite ? 'favorite' : 'favorite_border',
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
                         color: isFavorite
-                            ? AppTheme.lightTheme.colorScheme.secondary
+                            ? Colors.red
                             : AppTheme.lightTheme.colorScheme.onSurface
                                 .withValues(alpha: 0.6),
                         size: 20,
@@ -155,7 +181,7 @@ class PopularSushiCardWidget extends StatelessWidget {
               ],
             ),
             Container( // Заменяем Expanded на Container с фиксированной высотой
-              height: 8.h,
+              height: 6.h, // Уменьшаем высоту
               padding: EdgeInsets.all(3.w),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +195,7 @@ class PopularSushiCardWidget extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 8), // Небольшой отступ вместо Spacer
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -181,7 +207,7 @@ class PopularSushiCardWidget extends StatelessWidget {
                         ),
                       ),
                       GestureDetector(
-                        onTap: onAddToCart,
+                        onTap: widget.onAddToCart,
                         child: Container(
                           padding: EdgeInsets.all(1.w),
                           decoration: BoxDecoration(

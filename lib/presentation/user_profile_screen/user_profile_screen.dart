@@ -52,7 +52,7 @@ class UserProfileScreen extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/menu-browse-screen');
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/sets-browse-screen');
+              Navigator.pushReplacementNamed(context, '/favorites-screen');
               break;
             case 3:
               Navigator.pushReplacementNamed(context, '/shopping-cart-screen');
@@ -73,8 +73,8 @@ class UserProfileScreen extends StatelessWidget {
             label: 'Menu',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.set_meal),
-            label: 'Sets',
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),

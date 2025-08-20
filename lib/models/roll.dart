@@ -2,14 +2,14 @@ class Roll {
   final int id;
   final String name;
   final double salePrice;
-  final double cost;
+  final double costPrice; // Changed from cost
   final List<RollIngredient>? ingredients;
 
   Roll({
     required this.id,
     required this.name,
     required this.salePrice,
-    required this.cost,
+    required this.costPrice, // Changed from cost
     this.ingredients,
   });
 
@@ -18,7 +18,7 @@ class Roll {
       id: json['id']?.toInt() ?? 0,
       name: json['name'] ?? '',
       salePrice: (json['sale_price'] ?? 0.0).toDouble(),
-      cost: (json['cost'] ?? 0.0).toDouble(),
+      costPrice: (json['cost_price'] ?? 0.0).toDouble(), // Changed from cost
       ingredients: json['ingredients'] != null
           ? (json['ingredients'] as List)
               .map((e) => RollIngredient.fromJson(e))
@@ -32,14 +32,14 @@ class Roll {
       'id': id,
       'name': name,
       'sale_price': salePrice,
-      'cost': cost,
+      'cost_price': costPrice, // Changed from cost
       'ingredients': ingredients?.map((e) => e.toJson()).toList(),
     };
   }
 
   @override
   String toString() {
-    return 'Roll(id: $id, name: $name, salePrice: $salePrice, cost: $cost)';
+    return 'Roll(id: $id, name: $name, salePrice: $salePrice, costPrice: $costPrice)'; // Changed from cost
   }
 }
 

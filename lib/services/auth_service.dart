@@ -42,6 +42,8 @@ class AuthService {
       print('❌ API сервер недоступен');
     }
     
+    print('👤 Текущий пользователь: ${_currentUser?.name ?? "не авторизован"}');
+    print('🔑 Текущий токен: ${_currentSessionToken?.substring(0, 20) ?? "нет"}...');
     print('✅ AuthService инициализирован');
   }
 
@@ -67,12 +69,19 @@ class AuthService {
         password: password,
       );
 
+      print('📡 Результат API регистрации: $result');
+
       if (result['success']) {
+        print('🎉 API вернул успешный результат регистрации');
         final user = result['user'] as User;
         final accessToken = result['access_token'] as String;
         
+        print('👤 Пользователь из API: ${user.name} (${user.email})');
+        print('🔑 Токен из API: ${accessToken.substring(0, 20)}...');
+        
         await _createSession(user, accessToken);
         
+        print('✅ Сессия создана, возвращаем AuthResult');
         return AuthResult(
           success: true,
           message: result['message'] as String,
@@ -108,12 +117,19 @@ class AuthService {
         password: password,
       );
 
+      print('📡 Результат API входа: $result');
+
       if (result['success']) {
+        print('🎉 API вернул успешный результат входа');
         final user = result['user'] as User;
         final accessToken = result['access_token'] as String;
         
+        print('👤 Пользователь из API входа: ${user.name} (${user.email})');
+        print('🔑 Токен из API входа: ${accessToken.substring(0, 20)}...');
+        
         await _createSession(user, accessToken);
         
+        print('✅ Сессия создана для входа, возвращаем AuthResult');
         return AuthResult(
           success: true,
           message: result['message'] as String,
@@ -149,10 +165,18 @@ class AuthService {
 
   Future<void> _createSession(User user, String accessToken) async {
     try {
+      print('🔐 Создание сессии для пользователя: ${user.name}');
+      print('📧 Email: ${user.email}');
+      print('🆔 ID: ${user.id}');
+      print('🔑 Токен: ${accessToken.substring(0, 20)}...');
+      
       _currentUser = user;
       _currentSessionToken = accessToken;
 
       print('✅ Сессия создана для ${user.name} через API');
+      print('👤 Текущий пользователь: ${_currentUser?.name}');
+      print('🔑 Текущий токен: ${_currentSessionToken?.substring(0, 20)}...');
+      print('🔍 Проверка isLoggedIn: ${isLoggedIn}');
     } catch (e) {
       print('❌ Ошибка создания сессии: $e');
     }
@@ -197,6 +221,90 @@ class AuthService {
       }
     } catch (e) {
       print('❌ Ошибка получения пользователей: $e');
+    }
+  }
+
+  // Обновление профиля
+  Future<AuthResult> updateProfile({
+    String? name,
+    String? phone,
+    String? location, // Добавляю локацию
+  }) async {
+    try {
+      if (_currentSessionToken == null) {
+        return AuthResult(
+          success: false,
+          message: 'Необходимо войти в систему',
+        );
+      }
+
+      final result = await _userService.updateProfile(
+        accessToken: _currentSessionToken!,
+        name: name,
+        phone: phone,
+        location: location, // Добавляю локацию
+      );
+
+      if (result['success']) {
+        final updatedUser = result['user'] as User;
+        _currentUser = updatedUser;
+        
+        return AuthResult(
+          success: true,
+          message: result['message'] as String,
+          user: updatedUser,
+        );
+      } else {
+        return AuthResult(
+          success: false,
+          message: result['error'] as String,
+        );
+      }
+    } catch (e) {
+      print('❌ Ошибка обновления профиля: $e');
+      return AuthResult(
+        success: false,
+        message: 'Произошла ошибка при обновлении профиля',
+      );
+    }
+  }
+
+  // Изменение пароля
+  Future<AuthResult> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      if (_currentSessionToken == null) {
+        return AuthResult(
+          success: false,
+          message: 'Необходимо войти в систему',
+        );
+      }
+
+      final result = await _userService.changePassword(
+        accessToken: _currentSessionToken!,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+
+      if (result['success']) {
+        return AuthResult(
+          success: true,
+          message: result['message'] as String,
+        );
+      } else {
+        return AuthResult(
+          success: false,
+          message: result['error'] as String,
+        );
+      }
+    } catch (e) {
+      print('❌ Ошибка изменения пароля: $e');
+      return AuthResult(
+        success: false,
+        message: 'Произошла ошибка при изменении пароля',
+      );
     }
   }
 }

@@ -6,7 +6,7 @@ import '../models/user.dart';
 import '../models/cart_item.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'http://172.16.4.51:5000/api'; // Updated to real IP
   static String? _authToken;
 
   static void setAuthToken(String token) {

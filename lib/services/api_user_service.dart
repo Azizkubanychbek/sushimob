@@ -7,7 +7,7 @@ class ApiUserService {
   factory ApiUserService() => _instance;
   ApiUserService._internal();
 
-  static const String _baseUrl = 'http://localhost:5000/api';
+  static const String _baseUrl = 'http://172.16.4.51:5000/api'; // Updated to real IP
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };
@@ -61,12 +61,19 @@ class ApiUserService {
       );
 
       final jsonData = jsonDecode(response.body);
+      print('📡 API ответ: ${response.statusCode} - ${response.body}');
       
       if (response.statusCode == 201) {
         print('✅ API: Пользователь $email успешно зарегистрирован');
+        print('👤 Данные пользователя: ${jsonData['user']}');
+        print('🔑 Токен: ${jsonData['access_token']?.substring(0, 20)}...');
+        
+        final user = User.fromJson(jsonData['user']);
+        print('👤 Создан объект User: ${user.name} (${user.email})');
+        
         return {
           'success': true,
-          'user': User.fromJson(jsonData['user']),
+          'user': user,
           'access_token': jsonData['access_token'],
           'message': jsonData['message'],
         };
@@ -104,12 +111,19 @@ class ApiUserService {
       );
 
       final jsonData = jsonDecode(response.body);
+      print('📡 API ответ на вход: ${response.statusCode} - ${response.body}');
       
       if (response.statusCode == 200) {
         print('✅ API: Пользователь $email успешно вошел');
+        print('👤 Данные пользователя: ${jsonData['user']}');
+        print('🔑 Токен: ${jsonData['access_token']?.substring(0, 20)}...');
+        
+        final user = User.fromJson(jsonData['user']);
+        print('👤 Создан объект User для входа: ${user.name} (${user.email})');
+        
         return {
           'success': true,
-          'user': User.fromJson(jsonData['user']),
+          'user': user,
           'access_token': jsonData['access_token'],
           'message': jsonData['message'],
         };
@@ -202,6 +216,99 @@ class ApiUserService {
     } catch (e) {
       print('❌ API: Ошибка проверки email: $e');
       return false;
+    }
+  }
+
+  // Обновление профиля пользователя
+  Future<Map<String, dynamic>> updateProfile({
+    required String accessToken,
+    String? name,
+    String? phone,
+    String? location, // Добавляю локацию
+  }) async {
+    try {
+      print('🌐 API: Обновление профиля...');
+      
+      final response = await http.put(
+        Uri.parse('$_baseUrl/profile/update'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          if (name != null) 'name': name,
+          if (phone != null) 'phone': phone,
+          if (location != null) 'location': location, // Добавляю локацию
+        }),
+      );
+
+      final jsonData = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('✅ API: Профиль успешно обновлен');
+        return {
+          'success': true,
+          'user': User.fromJson(jsonData['user']),
+          'message': jsonData['message'],
+        };
+      } else {
+        print('❌ API: Ошибка обновления профиля: ${jsonData['error']}');
+        return {
+          'success': false,
+          'error': jsonData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ API: Ошибка сети при обновлении профиля: $e');
+      return {
+        'success': false,
+        'error': 'Ошибка сети: $e',
+      };
+    }
+  }
+
+  // Изменение пароля
+  Future<Map<String, dynamic>> changePassword({
+    required String accessToken,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      print('🌐 API: Изменение пароля...');
+      
+      final response = await http.put(
+        Uri.parse('$_baseUrl/profile/change-password'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        }),
+      );
+
+      final jsonData = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('✅ API: Пароль успешно изменен');
+        return {
+          'success': true,
+          'message': jsonData['message'],
+        };
+      } else {
+        print('❌ API: Ошибка изменения пароля: ${jsonData['error']}');
+        return {
+          'success': false,
+          'error': jsonData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ API: Ошибка сети при изменении пароля: $e');
+      return {
+        'success': false,
+        'error': 'Ошибка сети: $e',
+      };
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/auth_service.dart';
+import '../edit_profile_screen.dart';
 
 class ProfileSectionWidget extends StatefulWidget {
   ProfileSectionWidget({super.key});
@@ -63,7 +64,7 @@ class _ProfileSectionWidgetState extends State<ProfileSectionWidget> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${user!.loyaltyPoints} баллов',
+                        'Активный пользователь',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -73,6 +74,41 @@ class _ProfileSectionWidgetState extends State<ProfileSectionWidget> {
                   ),
                 ],
                 const SizedBox(height: 12),
+                if (isLoggedIn) ...[
+                  // Кнопка редактирования профиля
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final updatedUser = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditProfileScreen(user: user!),
+                          ),
+                        );
+                        if (updatedUser != null) {
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Профиль обновлен'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Редактировать профиль'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).primaryColor,
+                        side: BorderSide(color: Theme.of(context).primaryColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

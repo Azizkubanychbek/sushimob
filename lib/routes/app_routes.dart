@@ -4,6 +4,7 @@ import '../presentation/user_profile_screen/user_profile_screen.dart';
 import '../presentation/menu_browse_screen/menu_browse_screen.dart';
 import '../presentation/sets_browse_screen/sets_browse_screen.dart';
 import '../presentation/shopping_cart_screen/shopping_cart_screen.dart';
+import '../presentation/favorites_screen/favorites_screen.dart';
 import '../presentation/home_screen/home_screen.dart';
 import '../presentation/product_detail_screen/product_detail_screen.dart';
 import '../presentation/auth_screen/auth_screen.dart';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const String menuBrowseScreen = '/menu-browse-screen';
   static const String setsBrowseScreen = '/sets-browse-screen';
   static const String shoppingCartScreen = '/shopping-cart-screen';
+  static const String favoritesScreen = '/favorites-screen';
   static const String homeScreen = '/home-screen';
   static const String productDetailScreen = '/product-detail-screen';
   static const String loginScreen = '/login-screen';
@@ -34,6 +36,7 @@ class AppRoutes {
     menuBrowseScreen: (context) => const MenuBrowseScreen(),
     setsBrowseScreen: (context) => const SetsBrowseScreen(),
     shoppingCartScreen: (context) => const ShoppingCartScreen(),
+    favoritesScreen: (context) => const FavoritesScreen(),
     homeScreen: (context) => const HomeScreen(),
     productDetailScreen: (context) => const ProductDetailScreen(),
     loginScreen: (context) => const LoginScreen(),

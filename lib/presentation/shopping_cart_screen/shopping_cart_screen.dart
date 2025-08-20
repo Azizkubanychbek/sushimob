@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../services/cart_service.dart';
+import '../../models/cart_item.dart';
 import 'widgets/empty_cart_widget.dart';
 import 'widgets/order_summary_widget.dart';
 import 'widgets/promo_code_widget.dart';
@@ -11,7 +13,116 @@ class ShoppingCartScreen extends StatefulWidget {
 }
 
 class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
-  bool get isEmpty => true; // TODO: implement cart logic
+  final CartService _cartService = CartService();
+  List<CartItem> _cartItems = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCart();
+  }
+
+  Future<void> _loadCart() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    await _cartService.loadCart();
+    
+    if (mounted) {
+      setState(() {
+        _cartItems = _cartService.cartItems;
+        _isLoading = false;
+      });
+    }
+  }
+
+  bool get isEmpty => _cartItems.isEmpty;
+
+  Widget _buildCartItem(CartItem item) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Изображение товара
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[200],
+              ),
+              child: item.itemType == 'roll' 
+                  ? const Icon(Icons.restaurant, size: 40, color: Colors.grey)
+                  : const Icon(Icons.set_meal, size: 40, color: Colors.grey),
+            ),
+            const SizedBox(width: 16),
+            
+            // Информация о товаре
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.itemName,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${item.price.toStringAsFixed(2)} ₽',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Управление количеством
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () async {
+                    if (item.quantity > 1) {
+                      await _cartService.updateQuantity(item.id, item.quantity - 1);
+                      _loadCart();
+                    }
+                  },
+                  icon: const Icon(Icons.remove_circle_outline),
+                ),
+                Text(
+                  '${item.quantity}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                IconButton(
+                  onPressed: () async {
+                    await _cartService.updateQuantity(item.id, item.quantity + 1);
+                    _loadCart();
+                  },
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
+            
+            // Кнопка удаления
+            IconButton(
+              onPressed: () async {
+                await _cartService.removeFromCart(item.id);
+                _loadCart();
+              },
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,19 +131,26 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
         title: const Text('Корзина'),
         centerTitle: true,
       ),
-      body: isEmpty
-          ? const EmptyCartWidget()
-          : const SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // TODO: Add cart items list
-                  PromoCodeWidget(),
-                  SizedBox(height: 24),
-                  OrderSummaryWidget(),
-                ],
-              ),
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : isEmpty
+              ? const EmptyCartWidget()
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Список товаров в корзине
+                      ..._cartItems.map((item) => _buildCartItem(item)),
+                      const SizedBox(height: 24),
+                      const PromoCodeWidget(),
+                      const SizedBox(height: 24),
+                      OrderSummaryWidget(
+                        totalPrice: _cartService.totalPrice,
+                        totalItems: _cartService.totalItems,
+                      ),
+                    ],
+                  ),
+                ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -57,7 +175,7 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
                   Navigator.pushReplacementNamed(context, '/menu-browse-screen');
                   break;
                 case 2:
-                  Navigator.pushReplacementNamed(context, '/sets-browse-screen');
+                  Navigator.pushReplacementNamed(context, '/favorites-screen');
                   break;
                 case 3:
                   // Already on cart
@@ -78,8 +196,8 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
             label: 'Menu',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.set_meal),
-            label: 'Sets',
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),

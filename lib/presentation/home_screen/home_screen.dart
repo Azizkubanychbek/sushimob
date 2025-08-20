@@ -5,6 +5,9 @@ import 'package:sizer/sizer.dart';
 import '../../core/app_export.dart';
 import '../../services/sushi_data_service.dart';
 import '../../services/csv_data_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/cart_service.dart';
+import '../../services/favorites_service.dart';
 import '../../models/app_roll.dart';
 import '../../models/app_set.dart';
 import './widgets/banner_carousel_widget.dart';
@@ -60,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<AppRoll> popularSushi = [];
   List<AppSet> popularSets = [];
   List<Map<String, dynamic>> categories = [];
+  List<dynamic> favoriteItems = []; // Избранные товары (роллы и сеты)
   bool _isLoading = false;
 
   @override
@@ -67,6 +71,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _startBannerAutoScroll();
     _loadData();
+    
+    // Проверяем, авторизован ли пользователь
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authService = AuthService();
+      if (!authService.isLoggedIn) {
+        print('🔐 Пользователь не авторизован, перенаправляем на регистрацию');
+        Navigator.pushReplacementNamed(context, '/register-screen');
+      } else {
+        print('✅ Пользователь авторизован: ${authService.currentUser?.name}');
+        // Пользователь авторизован, загружаем данные и показываем главную страницу
+        print('🏠 Остаемся на главной странице');
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -81,7 +98,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final sets = await SushiDataService.getPopularSets();
       final rollCategories = await CsvDataService.getCategories();
       
-      print('🔍 DEBUG: Получено роллов: ${rolls.length}, сетов: ${sets.length}, категорий: ${rollCategories.length}');
+      // Загружаем избранное
+      final favoritesService = FavoritesService();
+      await favoritesService.loadFavorites();
+      final favorites = favoritesService.favoriteItems;
+      
+      print('🔍 DEBUG: Получено роллов: ${rolls.length}, сетов: ${sets.length}, категорий: ${rollCategories.length}, избранного: ${favorites.length}');
       if (rolls.isNotEmpty) {
         print('🔍 DEBUG: Первый ролл: ${rolls.first.name} - ${rolls.first.formattedPrice}');
       }
@@ -138,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         setState(() {
           popularSushi = rolls.take(6).toList();
           popularSets = sets.take(3).toList();
+          favoriteItems = favorites;
           categories = dynamicCategories;
         });
         print('✅ Данные успешно загружены: ${popularSushi.length} роллов, ${popularSets.length} сетов, ${categories.length} категорий');
@@ -198,31 +221,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _onAddToCart(dynamic item) {
+  void _onAddToCart(dynamic item) async {
     HapticFeedback.lightImpact();
     String itemName = '';
+    String itemType = '';
+    int itemId = 0;
     
     try {
       if (item is AppRoll) {
         itemName = item.name.isNotEmpty ? item.name : 'Ролл';
+        itemType = 'roll';
+        itemId = item.id;
       } else if (item is AppSet) {
         itemName = item.name.isNotEmpty ? item.name : 'Сет';
+        itemType = 'set';
+        itemId = item.id;
       } else if (item is Map<String, dynamic>) {
         itemName = (item["name"]?.toString() ?? 'Item').isNotEmpty ? item["name"] : 'Item';
+        itemType = 'roll'; // По умолчанию считаем роллом
+        itemId = item["id"] ?? 0;
       } else {
         itemName = 'Item';
+        itemType = 'roll';
+        itemId = 0;
+      }
+      
+      // Добавляем товар в корзину через CartService
+      final cartService = CartService();
+      final success = await cartService.addToCart(
+        itemType: itemType,
+        itemId: itemId,
+        quantity: 1,
+      );
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$itemName добавлен в корзину'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ошибка добавления в корзину'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       print('❌ Ошибка в _onAddToCart: $e');
-      itemName = 'Item';
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ошибка добавления в корзину'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$itemName добавлен в корзину'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   void _onItemLongPress(dynamic item) {
@@ -374,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           SizedBox(height: 3.h),
                           _buildPopularSushiSection(),
                           SizedBox(height: 2.h),
-                          _buildPopularSetsSection(),
+                          _buildFavoritesSection(),
                           SizedBox(height: 2.h),
                           _buildRecommendedSection(),
                           SizedBox(height: 2.h),
@@ -615,8 +673,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildPopularSetsSection() {
-    if (popularSets.isEmpty) return const SizedBox.shrink();
+  Widget _buildFavoritesSection() {
+    final favoritesService = FavoritesService();
+    if (favoriteItems.isEmpty) return const SizedBox.shrink();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,30 +686,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Популярные сеты', 
+                'Избранное', 
                 style: AppTheme.lightTheme.textTheme.headlineSmall
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/sets-browse-screen');
+                  Navigator.pushReplacementNamed(context, '/favorites-screen');
                 }, 
-                child: Text('Все сеты')
+                child: Text('Все избранное')
               ),
             ],
           ),
         ),
         SizedBox(height: 1.h),
         SizedBox(
-          height: 18.h, // Увеличиваем высоту для сетов
+          height: 18.h, // Увеличиваем высоту для избранного
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 4.w),
-            itemCount: popularSets.length,
+            itemCount: favoriteItems.length,
             itemBuilder: (context, index) {
-              final set = popularSets[index];
+              final item = favoriteItems[index];
               
               // Защита от null значений
-              if (set == null) return const SizedBox.shrink();
+              if (item == null) return const SizedBox.shrink();
               
               return GestureDetector(
                 onTap: () {
@@ -658,8 +717,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     context, 
                     '/product-detail-screen',
                     arguments: {
-                      'productId': set.id,
-                      'productType': 'set',
+                      'productId': item.item.id,
+                      'productType': item.itemType,
                     }
                   );
                 },
@@ -679,23 +738,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(12)
                           ),
-                          child: Image.network(
-                            set.imageUrl.isNotEmpty ? set.imageUrl : 'https://images.pexels.com/photos/2098085/pexels-photo-2098085.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-                            width: double.infinity,
-                            height: 12.h, // Увеличиваем высоту изображения
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 7.h, // Уменьшаем высоту
-                                color: Colors.grey[300],
-                                child: const Icon(
-                                  Icons.restaurant, 
-                                  size: 40, 
-                                  color: Colors.grey
+                          child: item.imageUrl.isNotEmpty 
+                              ? Image.network(
+                                  item.imageUrl,
+                                  width: double.infinity,
+                                  height: 12.h,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      height: 7.h,
+                                      color: Colors.grey[300],
+                                      child: Icon(
+                                        item.itemType == 'roll' 
+                                            ? Icons.restaurant 
+                                            : Icons.set_meal,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  height: 7.h,
+                                  color: Colors.grey[300],
+                                  child: Icon(
+                                    item.itemType == 'roll' 
+                                        ? Icons.restaurant 
+                                        : Icons.set_meal,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
                         ),
                         Container( // Оборачиваем в Container с фиксированной высотой
                           height: 4.h, // Увеличиваем высоту для текста
@@ -706,7 +779,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween, // Простое распределение
                             children: [
                               Text(
-                                set.name.isNotEmpty ? set.name : 'Сет $index',
+                                item.itemName.isNotEmpty ? item.itemName : 'Товар $index',
                                 style: AppTheme.lightTheme.textTheme.titleSmall?.copyWith(
                                   fontSize: 12, // Увеличиваем размер шрифта
                                 ),
@@ -717,14 +790,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    set.formattedPrice,
+                                    '${item.price.toStringAsFixed(2)} ₽',
                                     style: AppTheme.lightTheme.textTheme.titleSmall?.copyWith(
                                       color: AppTheme.lightTheme.colorScheme.primary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11, // Увеличиваем размер шрифта
                                     ),
                                   ),
-                                  if (set.hasDiscount)
+                                  if (item.itemType == 'set' && (item.item as dynamic).hasDiscount)
                                     Container(
                                       padding: EdgeInsets.symmetric(
                                         horizontal: 2.w, // Увеличиваем padding
@@ -735,7 +808,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         borderRadius: BorderRadius.circular(8) // Увеличиваем радиус
                                       ),
                                       child: Text(
-                                        '-${set.formattedDiscount}',
+                                        '-${(item.item as dynamic).formattedDiscount}',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 10, // Увеличиваем размер шрифта
@@ -743,6 +816,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  // Кнопка "Добавить в избранное"
+                                  Expanded(
+                                    child: IconButton(
+                                      onPressed: () async {
+                                        final favoritesService = FavoritesService();
+                                        final success = await favoritesService.toggleFavorite(
+                                          itemType: item.itemType,
+                                          itemId: item.item.id,
+                                        );
+                                        
+                                        if (success) {
+                                          // Обновляем UI через перезагрузку данных
+                                          _loadData();
+                                        }
+                                      },
+                                      icon: Icon(
+                                        Icons.favorite,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                  // Кнопка "Добавить в корзину"
+                                  Expanded(
+                                    flex: 2,
+                                    child: ElevatedButton(
+                                      onPressed: () => _onAddToCart(item.item),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.lightTheme.colorScheme.primary,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 0.5.h),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'В корзину',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -761,6 +883,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildRecommendedSection() {
+    final favoritesService = FavoritesService();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -882,12 +1005,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                             color: Colors.green,
                                           ),
                                         ),
-                                        IconButton(
-                                          onPressed: () => _onAddToCart(roll),
-                                          icon: const Icon(Icons.add_circle),
-                                          iconSize: 20,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
+                                        Row(
+                                          children: [
+                                            // Кнопка "Добавить в избранное"
+                                            IconButton(
+                                              onPressed: () async {
+                                                final favoritesService = FavoritesService();
+                                                final success = await favoritesService.toggleFavorite(
+                                                  itemType: 'roll',
+                                                  itemId: roll.id,
+                                                );
+                                                
+                                                if (success) {
+                                                  // Обновляем UI через перезагрузку данных
+                                                  _loadData();
+                                                }
+                                              },
+                                              icon: Icon(
+                                                favoritesService.isInFavorites('roll', roll.id) 
+                                                    ? Icons.favorite 
+                                                    : Icons.favorite_border,
+                                                color: favoritesService.isInFavorites('roll', roll.id) 
+                                                    ? Colors.red 
+                                                    : Colors.grey,
+                                              ),
+                                              iconSize: 20,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                            // Кнопка "Добавить в корзину"
+                                            IconButton(
+                                              onPressed: () => _onAddToCart(roll),
+                                              icon: const Icon(Icons.add_circle),
+                                              iconSize: 20,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -972,7 +1126,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               _buildNavItem(0, Icons.home, 'Home'),
               _buildNavItem(1, Icons.restaurant_menu, 'Menu'),
-              _buildNavItem(2, Icons.set_meal, 'Sets'),
+              _buildNavItem(2, Icons.favorite, 'Favorites'),
               _buildNavItem(3, Icons.shopping_cart, 'Cart'),
               _buildNavItem(4, Icons.person, 'Profile'),
             ],
@@ -998,7 +1152,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Navigator.pushReplacementNamed(context, '/menu-browse-screen');
             break;
           case 2:
-            Navigator.pushReplacementNamed(context, '/sets-browse-screen');
+            Navigator.pushReplacementNamed(context, '/favorites-screen');
             break;
           case 3:
             Navigator.pushReplacementNamed(context, '/shopping-cart-screen');

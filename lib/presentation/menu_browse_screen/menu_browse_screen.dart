@@ -119,7 +119,7 @@ class _MenuBrowseScreenState extends State<MenuBrowseScreen> {
               // Already on menu
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/sets-browse-screen');
+              Navigator.pushReplacementNamed(context, '/favorites-screen');
               break;
             case 3:
               Navigator.pushReplacementNamed(context, '/shopping-cart-screen');
@@ -140,8 +140,8 @@ class _MenuBrowseScreenState extends State<MenuBrowseScreen> {
             label: 'Menu',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.set_meal),
-            label: 'Sets',
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),

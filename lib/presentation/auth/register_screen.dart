@@ -60,13 +60,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        print('✅ Регистрация успешна! Переходим на главную страницу...');
+        print('📱 Пользователь: ${result.user?.name} (${result.user?.email})');
+        print('🔑 Токен: ${result.sessionToken}');
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result.message ?? 'Регистрация прошла успешно!'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pushReplacementNamed(context, '/');
+        
+        // Автоматически переходим на главную страницу после успешной регистрации
+        if (mounted) {
+          print('🚀 Навигация на /home-screen...');
+          Navigator.pushNamedAndRemoveUntil(
+            context, 
+            '/home-screen', 
+            (route) => false
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

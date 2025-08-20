@@ -3,23 +3,56 @@ class User {
   final String name;
   final String email;
   final String phone;
+  final String? location; // Добавляю локацию
+  final int loyaltyPoints; // Возвращаю лоялити
+  final String? favorites; // JSON строка с избранными
   final String passwordHash;
   final DateTime createdAt;
   final DateTime? lastLoginAt;
   final bool isActive;
-  final int loyaltyPoints;
 
   User({
     this.id,
     required this.name,
     required this.email,
     required this.phone,
+    this.location, // Добавляю локацию
+    this.loyaltyPoints = 0, // Возвращаю лоялити
+    this.favorites, // Добавляю избранное
     required this.passwordHash,
     required this.createdAt,
     this.lastLoginAt,
     this.isActive = true,
-    this.loyaltyPoints = 0,
   });
+
+  // Копирование с изменениями для редактирования
+  User copyWith({
+    int? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? location, // Добавляю локацию
+    int? loyaltyPoints, // Возвращаю лоялити
+    String? favorites, // Добавляю избранное
+    String? passwordHash,
+    DateTime? createdAt,
+    DateTime? lastLoginAt,
+    bool? isActive,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      location: location ?? this.location, // Добавляю локацию
+      loyaltyPoints: loyaltyPoints ?? this.loyaltyPoints, // Возвращаю лоялити
+      favorites: favorites ?? this.favorites, // Добавляю избранное
+      passwordHash: passwordHash ?? this.passwordHash,
+      createdAt: createdAt ?? this.createdAt,
+      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+      isActive: isActive ?? this.isActive,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -27,11 +60,13 @@ class User {
       'name': name,
       'email': email,
       'phone': phone,
+      'location': location, // Добавляю локацию
+      'loyalty_points': loyaltyPoints, // Возвращаю лоялити
+      'favorites': favorites, // Добавляю избранное
       'password_hash': passwordHash,
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'is_active': isActive ? 1 : 0,
-      'loyalty_points': loyaltyPoints,
     };
   }
 
@@ -41,13 +76,15 @@ class User {
       name: map['name'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
+      location: map['location'], // Добавляю локацию
+      loyaltyPoints: map['loyalty_points']?.toInt() ?? 0, // Возвращаю лоялити
+      favorites: map['favorites'], // Добавляю избранное
       passwordHash: map['password_hash'] ?? '',
       createdAt: DateTime.parse(map['created_at']),
       lastLoginAt: map['last_login_at'] != null 
           ? DateTime.parse(map['last_login_at']) 
           : null,
       isActive: (map['is_active'] ?? 1) == 1,
-      loyaltyPoints: map['loyalty_points']?.toInt() ?? 0,
     );
   }
 
@@ -58,7 +95,10 @@ class User {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
-      passwordHash: json['password_hash'] ?? '', // Теперь может читать хеш из localStorage
+      location: json['location'], // Добавляю локацию
+      loyaltyPoints: json['loyalty_points']?.toInt() ?? 0, // Возвращаю лоялити
+      favorites: json['favorites'], // Добавляю избранное
+      passwordHash: json['password_hash'] ?? '',
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -66,7 +106,6 @@ class User {
           ? DateTime.parse(json['last_login_at']) 
           : null,
       isActive: json['is_active'] ?? true,
-      loyaltyPoints: json['loyalty_points']?.toInt() ?? 0,
     );
   }
 
@@ -76,10 +115,12 @@ class User {
       'name': name,
       'email': email,
       'phone': phone,
+      'location': location, // Добавляю локацию
+      'loyalty_points': loyaltyPoints, // Возвращаю лоялити
+      'favorites': favorites, // Добавляю избранное
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'is_active': isActive,
-      'loyalty_points': loyaltyPoints,
     };
   }
 
@@ -90,58 +131,43 @@ class User {
       'name': name,
       'email': email,
       'phone': phone,
+      'location': location, // Добавляю локацию
+      'loyalty_points': loyaltyPoints, // Возвращаю лоялити
+      'favorites': favorites, // Добавляю избранное
       'password_hash': passwordHash,
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'is_active': isActive,
-      'loyalty_points': loyaltyPoints,
     };
   }
 
-  User copyWith({
-    int? id,
-    String? name,
-    String? email,
-    String? phone,
-    String? passwordHash,
-    DateTime? createdAt,
-    DateTime? lastLoginAt,
-    bool? isActive,
-    int? loyaltyPoints,
-  }) {
-    return User(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      email: email ?? this.email,
-      phone: phone ?? this.phone,
-      passwordHash: passwordHash ?? this.passwordHash,
-      createdAt: createdAt ?? this.createdAt,
-      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
-      isActive: isActive ?? this.isActive,
-      loyaltyPoints: loyaltyPoints ?? this.loyaltyPoints,
-    );
+  // Для API (без хеша пароля)
+  Map<String, dynamic> toApiJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'location': location, // Добавляю локацию
+      'loyalty_points': loyaltyPoints, // Возвращаю лоялити
+      'favorites': favorites, // Добавляю избранное
+      'created_at': createdAt.toIso8601String(),
+      'last_login_at': lastLoginAt?.toIso8601String(),
+      'is_active': isActive,
+    };
   }
 
   @override
   String toString() {
-    return 'User(id: $id, name: $name, email: $email, phone: $phone, loyaltyPoints: $loyaltyPoints)';
+    return 'User(id: $id, name: $name, email: $email, phone: $phone, location: $location, loyaltyPoints: $loyaltyPoints, isActive: $isActive)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is User &&
-        other.id == id &&
-        other.name == name &&
-        other.email == email &&
-        other.phone == phone;
+    return other is User && other.id == id;
   }
 
   @override
-  int get hashCode {
-    return id.hashCode ^
-        name.hashCode ^
-        email.hashCode ^
-        phone.hashCode;
-  }
+  int get hashCode => id.hashCode;
 }
