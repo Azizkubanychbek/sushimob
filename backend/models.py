@@ -20,6 +20,7 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
+    is_admin = db.Column(db.Boolean, default=False)  # Права администратора
 
     def to_dict(self):
         return {
@@ -33,7 +34,8 @@ class User(db.Model):
             'cart': self.cart,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
-            'is_active': self.is_active
+            'is_active': self.is_active,
+            'is_admin': self.is_admin
         }
 
 # Модель ингредиентов
@@ -231,4 +233,39 @@ class OrderItem(db.Model):
             'quantity': self.quantity,
             'unit_price': self.unit_price,
             'total_price': self.total_price
+        }
+
+# Модель дополнительных товаров (соусы, напитки, другое)
+class OtherItem(db.Model):
+    __tablename__ = 'other_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    cost_price = db.Column(db.Float, nullable=False)  # Себестоимость
+    sale_price = db.Column(db.Float, nullable=False)  # Цена продажи
+    category = db.Column(db.String(50), nullable=False)  # 'соусы', 'напитки', 'другое'
+    image_url = db.Column(db.String(255), nullable=True)
+    stock_quantity = db.Column(db.Float, default=0)  # Остаток на складе
+    unit = db.Column(db.String(20), default='шт')  # Единица измерения
+    is_popular = db.Column(db.Boolean, default=False)
+    is_new = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'cost_price': self.cost_price,
+            'sale_price': self.sale_price,
+            'category': self.category,
+            'image_url': self.image_url,
+            'stock_quantity': self.stock_quantity,
+            'unit': self.unit,
+            'is_popular': self.is_popular,
+            'is_new': self.is_new,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

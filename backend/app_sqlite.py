@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -20,7 +21,7 @@ app.config['JWT_SECRET_KEY'] = 'jwt-secret-string'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
 
 # Инициализация расширений
-from models import db, User, Ingredient, Roll, RollIngredient, Set, SetRoll, Order, OrderItem
+from models import db, User, Ingredient, Roll, RollIngredient, Set, SetRoll, Order, OrderItem, OtherItem
 db.init_app(app)
 
 jwt = JWTManager()
@@ -453,6 +454,52 @@ def get_set(set_id):
         print(f"❌ Ошибка при получении сета: {e}")
         return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
+# ===== API для дополнительных товаров (соусы, напитки) =====
+@app.route('/api/other-items', methods=['GET'])
+def get_other_items():
+    """Получение всех дополнительных товаров"""
+    try:
+        other_items = OtherItem.query.all()
+        return jsonify({
+            'success': True,
+            'other_items': [item.to_dict() for item in other_items],
+            'total': len(other_items)
+        }), 200
+    except Exception as e:
+        print(f"❌ Ошибка при получении дополнительных товаров: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/other-items/<int:item_id>', methods=['GET'])
+def get_other_item(item_id):
+    """Получение конкретного дополнительного товара"""
+    try:
+        item = OtherItem.query.get(item_id)
+        if not item:
+            return jsonify({'error': 'Товар не найден'}), 404
+        
+        return jsonify({
+            'success': True,
+            'other_item': item.to_dict()
+        }), 200
+    except Exception as e:
+        print(f"❌ Ошибка при получении товара: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/other-items/category/<category>', methods=['GET'])
+def get_other_items_by_category(category):
+    """Получение дополнительных товаров по категории"""
+    try:
+        items = OtherItem.query.filter_by(category=category).all()
+        return jsonify({
+            'success': True,
+            'category': category,
+            'other_items': [item.to_dict() for item in items],
+            'total': len(items)
+        }), 200
+    except Exception as e:
+        print(f"❌ Ошибка при получении товаров категории {category}: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
 # ===== API для заказов =====
 @app.route('/api/orders', methods=['POST'])
 @jwt_required()
@@ -741,6 +788,722 @@ def clear_cart():
     except Exception as e:
         print(f"❌ Ошибка при очистке корзины: {e}")
         return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+# Админ API endpoints
+@app.route('/api/admin/users', methods=['GET'])
+@jwt_required()
+def admin_get_users():
+    """Получить всех пользователей (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        users = User.query.all()
+        return jsonify({
+            'users': [user.to_dict() for user in users]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/rolls', methods=['GET', 'POST'])
+@jwt_required()
+def admin_rolls():
+    """Получить список роллов или создать новый ролл (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        if request.method == 'GET':
+            # Получить список роллов
+            rolls = Roll.query.all()
+            return jsonify({
+                'rolls': [roll.to_dict() for roll in rolls]
+            })
+        elif request.method == 'POST':
+            # Создать новый ролл
+            data = request.get_json()
+            
+            new_roll = Roll(
+                name=data['name'],
+                description=data.get('description', ''),
+                cost_price=float(data['cost_price']),
+                sale_price=float(data['sale_price']),
+                image_url=data.get('image_url', ''),
+                is_popular=data.get('is_popular', False),
+                is_new=data.get('is_new', False)
+            )
+            
+            db.session.add(new_roll)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Ролл создан успешно',
+                'roll': new_roll.to_dict()
+            }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/rolls/<int:roll_id>', methods=['PUT'])
+@jwt_required()
+def admin_update_roll(roll_id):
+    """Обновить ролл (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        roll = Roll.query.get(roll_id)
+        if not roll:
+            return jsonify({'error': 'Ролл не найден'}), 404
+        
+        data = request.get_json()
+        
+        roll.name = data.get('name', roll.name)
+        roll.description = data.get('description', roll.description)
+        roll.cost_price = float(data.get('cost_price', roll.cost_price))
+        roll.sale_price = float(data.get('sale_price', roll.sale_price))
+        roll.image_url = data.get('image_url', roll.image_url)
+        roll.is_popular = data.get('is_popular', roll.is_popular)
+        roll.is_new = data.get('is_new', roll.is_new)
+        roll.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Ролл обновлен успешно',
+            'roll': roll.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/rolls/<int:roll_id>', methods=['DELETE'])
+@jwt_required()
+def admin_delete_roll(roll_id):
+    """Удалить ролл (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        roll = Roll.query.get(roll_id)
+        if not roll:
+            return jsonify({'error': 'Ролл не найден'}), 404
+        
+        db.session.delete(roll)
+        db.session.commit()
+        
+        return jsonify({'message': 'Ролл удален успешно'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/rolls/<int:roll_id>/recipe', methods=['GET'])
+@jwt_required()
+def admin_get_roll_recipe(roll_id):
+    """Получить рецептуру ролла (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        roll = Roll.query.get(roll_id)
+        if not roll:
+            return jsonify({'error': 'Ролл не найден'}), 404
+        
+        # Получаем ингредиенты ролла из таблицы roll_ingredients
+        cursor = db.session.execute(text("""
+            SELECT ri.ingredient_id, ri.amount_per_roll, i.name, i.cost_per_unit, i.unit
+            FROM roll_ingredients ri
+            JOIN ingredients i ON ri.ingredient_id = i.id
+            WHERE ri.roll_id = :roll_id
+        """), {'roll_id': roll_id})
+        
+        ingredients = []
+        total_cost = 0
+        for row in cursor:
+            amount_per_roll = float(row[1])
+            cost_per_unit = float(row[3])
+            ingredient_cost = amount_per_roll * cost_per_unit  # amount_per_roll * cost_per_unit
+            total_cost += ingredient_cost
+            
+            ingredients.append({
+                'ingredient_id': int(row[0]),
+                'amount_per_roll': amount_per_roll,
+                'name': row[2],
+                'cost_per_unit': cost_per_unit,
+                'unit': row[4],
+                'calculated_cost': ingredient_cost
+            })
+        
+        return jsonify({
+            'roll_id': roll_id,
+            'roll_name': roll.name,
+            'ingredients': ingredients,
+            'total_cost': total_cost
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/rolls/<int:roll_id>/recipe', methods=['PUT'])
+@jwt_required()
+def admin_update_roll_recipe(roll_id):
+    """Обновить рецептуру ролла (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        roll = Roll.query.get(roll_id)
+        if not roll:
+            return jsonify({'error': 'Ролл не найден'}), 404
+        
+        data = request.get_json()
+        ingredients = data.get('ingredients', [])
+        
+        # Удаляем старую рецептуру
+        db.session.execute(text("DELETE FROM roll_ingredients WHERE roll_id = :roll_id"), 
+                          {'roll_id': roll_id})
+        
+        # Добавляем новую рецептуру
+        total_cost = 0
+        for ingredient in ingredients:
+            ingredient_id = ingredient['ingredient_id']
+            amount = ingredient['amount']
+            
+            # Получаем стоимость ингредиента
+            cursor = db.session.execute(text("""
+                SELECT cost_per_unit FROM ingredients WHERE id = :ingredient_id
+            """), {'ingredient_id': ingredient_id})
+            
+            result = cursor.fetchone()
+            if result:
+                cost_per_unit = result[0]
+                cost = cost_per_unit * amount
+                total_cost += cost
+                
+                # Добавляем ингредиент в рецепт
+                db.session.execute(text("""
+                    INSERT INTO roll_ingredients (roll_id, ingredient_id, amount_per_roll)
+                    VALUES (:roll_id, :ingredient_id, :amount)
+                """), {
+                    'roll_id': roll_id,
+                    'ingredient_id': ingredient_id,
+                    'amount': amount
+                })
+            else:
+                print(f"⚠️ Ингредиент с ID {ingredient_id} не найден")
+        
+        # Обновляем себестоимость ролла
+        roll.cost_price = total_cost
+        roll.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Рецептура ролла обновлена успешно',
+            'total_cost': total_cost,
+            'ingredients_count': len(ingredients)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/sets', methods=['GET', 'POST'])
+@jwt_required()
+def admin_sets():
+    """Получить список сетов или создать новый сет (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        if request.method == 'GET':
+            # Получить список сетов
+            sets = Set.query.all()
+            return jsonify({
+                'sets': [set_item.to_dict() for set_item in sets]
+            })
+        elif request.method == 'POST':
+            # Создать новый сет
+            data = request.get_json()
+            
+            new_set = Set(
+                name=data['name'],
+                description=data.get('description', ''),
+                cost_price=float(data['cost_price']),
+                set_price=float(data['set_price']),
+                discount_percent=data.get('discount_percent', 0.0),
+                image_url=data.get('image_url', ''),
+                is_popular=data.get('is_popular', False),
+                is_new=data.get('is_new', False)
+            )
+            
+            db.session.add(new_set)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Сет создан успешно',
+                'set': new_set.to_dict()
+            }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/sets/<int:set_id>', methods=['PUT'])
+@jwt_required()
+def admin_update_set(set_id):
+    """Обновить сет (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        set_item = Set.query.get(set_id)
+        if not set_item:
+            return jsonify({'error': 'Сет не найден'}), 404
+        
+        data = request.get_json()
+        
+        set_item.name = data.get('name', set_item.name)
+        set_item.description = data.get('description', set_item.description)
+        set_item.cost_price = float(data.get('cost_price', set_item.cost_price))
+        set_item.set_price = float(data.get('set_price', set_item.set_price))
+        set_item.discount_percent = float(data.get('discount_percent', set_item.discount_percent))
+        set_item.image_url = data.get('image_url', set_item.image_url)
+        set_item.is_popular = data.get('is_popular', set_item.is_popular)
+        set_item.is_new = data.get('is_new', set_item.is_new)
+        set_item.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Сет обновлен успешно',
+            'set': set_item.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/sets/<int:set_id>', methods=['DELETE'])
+@jwt_required()
+def admin_delete_set(set_id):
+    """Удалить сет (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        set_item = Set.query.get(set_id)
+        if not set_item:
+            return jsonify({'error': 'Сет не найден'}), 404
+        
+        db.session.delete(set_item)
+        db.session.commit()
+        
+        return jsonify({'message': 'Сет удален успешно'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/ingredients', methods=['GET'])
+@jwt_required()
+def admin_get_ingredients():
+    """Получить все ингредиенты (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        ingredients = Ingredient.query.all()
+        return jsonify({
+            'ingredients': [ing.to_dict() for ing in ingredients]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/ingredients', methods=['POST'])
+@jwt_required()
+def admin_create_ingredient():
+    """Создать новый ингредиент (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        data = request.get_json()
+        
+        new_ingredient = Ingredient(
+            name=data['name'],
+            cost_per_unit=float(data['cost_per_unit']),
+            price_per_unit=float(data['price_per_unit']),
+            stock_quantity=float(data.get('stock_quantity', 0)),
+            unit=data['unit']
+        )
+        
+        db.session.add(new_ingredient)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Ингредиент создан успешно',
+            'ingredient': new_ingredient.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/ingredients/<int:ingredient_id>', methods=['PUT'])
+@jwt_required()
+def admin_update_ingredient(ingredient_id):
+    """Обновить ингредиент (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        ingredient = Ingredient.query.get(ingredient_id)
+        if not ingredient:
+            return jsonify({'error': 'Ингредиент не найден'}), 404
+        
+        data = request.get_json()
+        
+        ingredient.name = data.get('name', ingredient.name)
+        ingredient.cost_per_unit = float(data.get('cost_per_unit', ingredient.cost_per_unit))
+        ingredient.price_per_unit = float(data.get('price_per_unit', ingredient.price_per_unit))
+        ingredient.stock_quantity = float(data.get('stock_quantity', ingredient.stock_quantity))
+        ingredient.unit = data.get('unit', ingredient.unit)
+        ingredient.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Ингредиент обновлен успешно',
+            'ingredient': ingredient.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/ingredients/<int:ingredient_id>', methods=['DELETE'])
+@jwt_required()
+def admin_delete_ingredient(ingredient_id):
+    """Удалить ингредиент (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        ingredient = Ingredient.query.get(ingredient_id)
+        if not ingredient:
+            return jsonify({'error': 'Ингредиент не найден'}), 404
+        
+        db.session.delete(ingredient)
+        db.session.commit()
+        
+        return jsonify({'message': 'Ингредиент удален успешно'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Админ API endpoints для соусов/напитков (other_items)
+@app.route('/api/admin/other-items', methods=['GET', 'POST'])
+@jwt_required()
+def admin_other_items():
+    """Получить список других товаров или создать новый (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        if request.method == 'GET':
+            # Получить список других товаров
+            items = OtherItem.query.all()
+            return jsonify({
+                'items': [item.to_dict() for item in items]
+            })
+        elif request.method == 'POST':
+            # Создать новый товар
+            data = request.get_json()
+            
+            new_item = OtherItem(
+                name=data['name'],
+                description=data.get('description', ''),
+                cost_price=float(data['cost_price']),
+                sale_price=float(data['sale_price']),
+                category=data['category'],
+                image_url=data.get('image_url', ''),
+                stock_quantity=data.get('stock_quantity', 0),
+                is_available=True
+            )
+            
+            db.session.add(new_item)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Товар создан успешно',
+                'item': new_item.to_dict()
+            }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/other-items/<int:item_id>', methods=['PUT'])
+@jwt_required()
+def admin_update_other_item(item_id):
+    """Обновить товар (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        item = OtherItem.query.get(item_id)
+        if not item:
+            return jsonify({'error': 'Товар не найден'}), 404
+        
+        data = request.get_json()
+        
+        item.name = data.get('name', item.name)
+        item.description = data.get('description', item.description)
+        item.cost_price = float(data.get('cost_price', item.cost_price))
+        item.sale_price = float(data.get('sale_price', item.sale_price))
+        item.category = data.get('category', item.category)
+        item.image_url = data.get('image_url', item.image_url)
+        item.stock_quantity = data.get('stock_quantity', item.stock_quantity)
+        item.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Товар обновлен успешно',
+            'item': item.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/other-items/<int:item_id>', methods=['DELETE'])
+@jwt_required()
+def admin_delete_other_item(item_id):
+    """Удалить товар (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        item = OtherItem.query.get(item_id)
+        if not item:
+            return jsonify({'error': 'Товар не найден'}), 404
+        
+        db.session.delete(item)
+        db.session.commit()
+        
+        return jsonify({'message': 'Товар удален успешно'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/stats', methods=['GET'])
+@jwt_required()
+def admin_get_stats():
+    """Получить статистику (только для админов)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        total_users = User.query.count()
+        total_rolls = Roll.query.count()
+        total_sets = Set.query.count()
+        total_ingredients = Ingredient.query.count()
+        active_users = User.query.filter_by(is_active=True).count()
+        
+        return jsonify({
+            'stats': {
+                'total_users': total_users,
+                'total_rolls': total_rolls,
+                'total_sets': total_sets,
+                'total_ingredients': total_ingredients,
+                'active_users': active_users
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# API для работы с составом сетов
+@app.route('/api/admin/sets/<int:set_id>/composition', methods=['GET'])
+@jwt_required()
+def admin_get_set_composition(set_id):
+    """Получить состав сета"""
+    try:
+        # Проверяем права администратора
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        # Получаем состав сета
+        query = text("""
+            SELECT sr.set_id, sr.roll_id, sr.quantity,
+                   r.name, r.cost_price, r.sale_price
+            FROM set_rolls sr
+            JOIN rolls r ON sr.roll_id = r.id
+            WHERE sr.set_id = :set_id
+        """)
+        
+        result = db.session.execute(query, {'set_id': set_id})
+        rows = result.fetchall()
+        
+        composition = []
+        for row in rows:
+            composition.append({
+                'set_id': row.set_id,
+                'roll_id': row.roll_id,
+                'quantity': row.quantity,
+                'roll_name': row.name,
+                'roll_cost_price': float(row.cost_price),
+                'roll_sale_price': float(row.sale_price)
+            })
+        
+        return jsonify({
+            'success': True,
+            'set_id': set_id,
+            'composition': composition
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/sets/<int:set_id>/composition', methods=['PUT'])
+@jwt_required()
+def admin_update_set_composition(set_id):
+    """Обновить состав сета"""
+    try:
+        # Проверяем права администратора
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Доступ запрещен'}), 403
+        
+        data = request.get_json()
+        rolls = data.get('rolls', [])
+        
+        # Удаляем старый состав
+        db.session.execute(text("DELETE FROM set_rolls WHERE set_id = :set_id"), {'set_id': set_id})
+        
+        # Добавляем новый состав
+        total_cost = 0
+        total_sale_price = 0
+        composition_for_description = []
+        
+        for roll_data in rolls:
+            roll_id = roll_data['roll_id']
+            quantity = roll_data['quantity']
+            
+            # Добавляем в состав
+            db.session.execute(text("""
+                INSERT INTO set_rolls (set_id, roll_id, quantity)
+                VALUES (:set_id, :roll_id, :quantity)
+            """), {'set_id': set_id, 'roll_id': roll_id, 'quantity': quantity})
+            
+            # Получаем цены ролла для расчета
+            roll_query = text("SELECT cost_price, sale_price FROM rolls WHERE id = :roll_id")
+            roll_result = db.session.execute(roll_query, {'roll_id': roll_id}).fetchone()
+            if roll_result:
+                total_cost += roll_result.cost_price * quantity
+                total_sale_price += roll_result.sale_price * quantity
+                # Для описания сета
+                name_row = db.session.execute(text("SELECT name FROM rolls WHERE id = :roll_id"), {'roll_id': roll_id}).fetchone()
+                if name_row:
+                    composition_for_description.append(f"{name_row.name} x{quantity}")
+        
+        # Обновляем цены сета (со скидкой 10%)
+        set_sale_price = total_sale_price * 0.9
+        discount_percent = 10.0
+        
+        # Собираем описание состава сета, чтобы отображать пользователям
+        description_text = 'Включает: ' + ', '.join(composition_for_description) if composition_for_description else ''
+
+        db.session.execute(text("""
+            UPDATE sets 
+            SET cost_price = :cost_price, 
+                set_price = :set_price,
+                description = :description,
+                discount_percent = :discount_percent
+            WHERE id = :set_id
+        """), {
+            'set_id': set_id,
+            'cost_price': total_cost,
+            'set_price': set_sale_price,
+            'description': description_text,
+            'discount_percent': discount_percent
+        })
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Состав сета обновлен',
+            'calculated_cost_price': total_cost,
+            'calculated_sale_price': set_sale_price,
+            'discount_percent': discount_percent,
+            'description': description_text,
+            'composition': composition_for_description
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 # Создание таблиц при запуске
 with app.app_context():

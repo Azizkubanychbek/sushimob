@@ -6,7 +6,7 @@ import '../models/user.dart';
 import '../models/cart_item.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://172.16.4.51:5000/api'; // Updated to real IP
+  static const String baseUrl = 'http://localhost:5000/api'; // Localhost для разработки
   static String? _authToken;
 
   static void setAuthToken(String token) {
@@ -44,13 +44,13 @@ class ApiService {
           'password': password,
           'name': name,
           'phone': phone,
-          'address': address,
+          'location': address, // Используем location вместо address
         }),
       );
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        _authToken = data['token'];
+        _authToken = data['access_token']; // Используем access_token
         return data;
       } else {
         final error = jsonDecode(response.body);
@@ -77,7 +77,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _authToken = data['token'];
+        _authToken = data['access_token']; // Используем access_token
         return data;
       } else {
         final error = jsonDecode(response.body);
@@ -123,6 +123,44 @@ class ApiService {
             .toList();
       } else {
         throw Exception('Ошибка получения сетов');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Новый метод для получения дополнительных товаров
+  static Future<List<Map<String, dynamic>>> getOtherItems() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/other-items'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['other_items']);
+      } else {
+        throw Exception('Ошибка получения дополнительных товаров');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Новый метод для получения товаров по категории
+  static Future<List<Map<String, dynamic>>> getOtherItemsByCategory(String category) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/other-items/category/$category'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['other_items']);
+      } else {
+        throw Exception('Ошибка получения товаров категории $category');
       }
     } catch (e) {
       throw Exception('Ошибка сети: $e');
@@ -203,6 +241,25 @@ class ApiService {
       if (response.statusCode != 200) {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Ошибка удаления из корзины');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Метод для получения всех ингредиентов (для редактора рецептуры)
+  static Future<List<Map<String, dynamic>>> getIngredients() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/ingredients'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['ingredients']);
+      } else {
+        throw Exception('Ошибка получения ингредиентов');
       }
     } catch (e) {
       throw Exception('Ошибка сети: $e');
@@ -304,5 +361,360 @@ class ApiService {
   // Выход
   static void logout() {
     _authToken = null;
+  }
+
+  // Админ API методы
+  static Future<List<Map<String, dynamic>>> getAdminUsers() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/users'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['users']);
+      } else {
+        throw Exception('Ошибка получения пользователей');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> createAdminRoll(Map<String, dynamic> rollData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/admin/rolls'),
+        headers: _headers,
+        body: jsonEncode(rollData),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка создания ролла');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateAdminRoll(int rollId, Map<String, dynamic> rollData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/rolls/$rollId'),
+        headers: _headers,
+        body: jsonEncode(rollData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка обновления ролла');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteAdminRoll(int rollId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/admin/rolls/$rollId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка удаления ролла');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> createAdminSet(Map<String, dynamic> setData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/admin/sets'),
+        headers: _headers,
+        body: jsonEncode(setData),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка создания сета');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateAdminSet(int setId, Map<String, dynamic> setData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/sets/$setId'),
+        headers: _headers,
+        body: jsonEncode(setData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка обновления сета');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteAdminSet(int setId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/admin/sets/$setId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка удаления сета');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminIngredients() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/ingredients'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['ingredients']);
+      } else {
+        throw Exception('Ошибка получения ингредиентов');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> createAdminIngredient(Map<String, dynamic> ingredientData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/admin/ingredients'),
+        headers: _headers,
+        body: jsonEncode(ingredientData),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка создания ингредиента');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateAdminIngredient(int ingredientId, Map<String, dynamic> ingredientData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/ingredients/$ingredientId'),
+        headers: _headers,
+        body: jsonEncode(ingredientData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка обновления ингредиента');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteAdminIngredient(int ingredientId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/admin/ingredients/$ingredientId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка удаления ингредиента');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // API методы для управления соусами/напитками
+  static Future<Map<String, dynamic>> createAdminOtherItem(Map<String, dynamic> itemData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/admin/other-items'),
+        headers: _headers,
+        body: jsonEncode(itemData),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка создания товара');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateAdminOtherItem(int itemId, Map<String, dynamic> itemData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/other-items/$itemId'),
+        headers: _headers,
+        body: jsonEncode(itemData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка обновления товара');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteAdminOtherItem(int itemId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/admin/other-items/$itemId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка удаления товара');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAdminStats() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/stats'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Ошибка получения статистики');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Админ API для рецептуры роллов
+  static Future<Map<String, dynamic>> getRollRecipe(int rollId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/rolls/$rollId/recipe'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения рецептуры');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateRollRecipe(int rollId, Map<String, dynamic> recipeData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/rolls/$rollId/recipe'),
+        headers: _headers,
+        body: jsonEncode(recipeData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка обновления рецептуры');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // API для работы с составом сетов
+  static Future<Map<String, dynamic>> getSetComposition(int setId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/sets/$setId/composition'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения состава сета');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateSetComposition(int setId, Map<String, dynamic> compositionData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/sets/$setId/composition'),
+        headers: _headers,
+        body: jsonEncode(compositionData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка обновления состава сета');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
   }
 }

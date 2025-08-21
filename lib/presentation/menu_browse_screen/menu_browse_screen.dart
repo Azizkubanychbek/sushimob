@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/sushi_data_service.dart';
 import '../../models/app_roll.dart';
+import '../../services/api_sushi_service.dart'; // Заменяем на API сервис
+import '../../theme/app_theme.dart';
+import '../../widgets/custom_image_widget.dart';
 import 'widgets/filter_bottom_sheet.dart';
 import 'widgets/sort_bottom_sheet.dart';
 import 'widgets/sushi_card_widget.dart';
@@ -51,7 +53,7 @@ class _MenuBrowseScreenState extends State<MenuBrowseScreen> {
 
     try {
       print('🔄 Загружаем роллы для меню...');
-      final rolls = await SushiDataService.getRolls();
+      final rolls = await ApiSushiService.getRolls();
       
       setState(() {
         _rolls = rolls;
@@ -210,7 +212,7 @@ class _MenuBrowseScreenState extends State<MenuBrowseScreen> {
                         padding: const EdgeInsets.all(16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.8,
+                          childAspectRatio: 0.9, // Более квадратные пропорции
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
                         ),

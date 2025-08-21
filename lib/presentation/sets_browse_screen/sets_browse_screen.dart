@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../services/sushi_data_service.dart';
 import '../../models/app_set.dart';
+import '../../services/api_sushi_service.dart'; // Заменяем на API сервис
+import '../../theme/app_theme.dart';
+import '../../widgets/custom_image_widget.dart';
+import '../set_detail_screen/set_detail_screen.dart';
 
 class SetsBrowseScreen extends StatefulWidget {
   const SetsBrowseScreen({super.key});
@@ -27,7 +30,7 @@ class _SetsBrowseScreenState extends State<SetsBrowseScreen> {
 
     try {
       print('🔄 Загружаем сеты для меню...');
-      final sets = await SushiDataService.getSets();
+      final sets = await ApiSushiService.getSets();
       
       setState(() {
         _sets = sets;
@@ -258,10 +261,10 @@ class _SetsBrowseScreenState extends State<SetsBrowseScreen> {
                                 ],
                               ),
                               onTap: () {
-                                // TODO: Переход к деталям сета
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Открыть детали сета: ${set.name}'),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => SetDetailScreen(setId: set.id),
                                   ),
                                 );
                               },

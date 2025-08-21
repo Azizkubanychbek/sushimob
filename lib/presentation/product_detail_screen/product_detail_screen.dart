@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
-import '../../services/sushi_data_service.dart';
 import '../../models/app_roll.dart';
 import '../../models/app_set.dart';
+import '../../services/api_sushi_service.dart'; // Заменяем на API сервис
+import '../../theme/app_theme.dart';
+import '../../widgets/custom_image_widget.dart';
+import 'widgets/add_to_cart_button_widget.dart';
+import 'widgets/customer_reviews_widget.dart';
+import 'widgets/customization_options_widget.dart';
+import 'widgets/nutritional_facts_widget.dart';
+import 'widgets/product_description_widget.dart';
+import 'widgets/product_image_carousel_widget.dart';
+import 'widgets/product_info_widget.dart';
+import 'widgets/quantity_selector_widget.dart';
+import 'widgets/related_items_widget.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int? productId;
@@ -46,7 +57,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _loadProductData() async {
     if (_productId == null) {
       // Показываем пример ролла если ID не передан
-      final rolls = await SushiDataService.getRolls();
+      final rolls = await ApiSushiService.getRolls();
       if (rolls.isNotEmpty) {
         setState(() {
           roll = rolls.first;
@@ -58,13 +69,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     try {
       if (_productType == 'set') {
-        final loadedSet = await SushiDataService.getSetById(_productId!);
+        final loadedSet = await ApiSushiService.getSetById(_productId!);
         setState(() {
           set = loadedSet;
           isLoading = false;
         });
       } else {
-        final loadedRoll = await SushiDataService.getRollById(_productId!);
+        final loadedRoll = await ApiSushiService.getRollById(_productId!);
         setState(() {
           roll = loadedRoll;
           isLoading = false;

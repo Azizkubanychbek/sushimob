@@ -3,8 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
-import '../../services/sushi_data_service.dart';
-import '../../services/csv_data_service.dart';
+import '../../services/api_sushi_service.dart'; // Заменяем на API сервис
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/favorites_service.dart';
@@ -94,16 +93,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       print('🔄 Загружаем реальные данные...');
       
-      final rolls = await SushiDataService.getPopularRolls();
-      final sets = await SushiDataService.getPopularSets();
-      final rollCategories = await CsvDataService.getCategories();
+      final rolls = await ApiSushiService.getPopularRolls();
+      final sets = await ApiSushiService.getPopularSets();
+      // Убираем CsvDataService.getCategories() и используем статические категории
+      // final rollCategories = await CsvDataService.getCategories();
       
       // Загружаем избранное
       final favoritesService = FavoritesService();
       await favoritesService.loadFavorites();
       final favorites = favoritesService.favoriteItems;
       
-      print('🔍 DEBUG: Получено роллов: ${rolls.length}, сетов: ${sets.length}, категорий: ${rollCategories.length}, избранного: ${favorites.length}');
+      print('🔍 DEBUG: Получено роллов: ${rolls.length}, сетов: ${sets.length}, избранного: ${favorites.length}');
       if (rolls.isNotEmpty) {
         print('🔍 DEBUG: Первый ролл: ${rolls.first.name} - ${rolls.first.formattedPrice}');
       }
@@ -123,7 +123,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         "route": "/menu-browse-screen",
       });
       
-      // Добавляем реальные категории роллов
+      // Добавляем статические категории роллов
+      final staticCategories = [
+        "Классические",
+        "Запеченные", 
+        "Острые",
+        "Вегетарианские",
+        "Премиум",
+        "Мини роллы"
+      ];
+      
       final categoryColors = [
         Color(0xFF1B4B5A),
         Color(0xFF2E7D32),
@@ -135,14 +144,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         Color(0xFFFF5722),
       ];
       
-      for (int i = 0; i < rollCategories.length; i++) {
+      for (int i = 0; i < staticCategories.length; i++) {
         dynamicCategories.add({
           "id": i + 1,
-          "name": rollCategories[i],
+          "name": staticCategories[i],
           "icon": "restaurant_menu",
           "color": categoryColors[i % categoryColors.length],
           "route": "/menu-browse-screen",
-          "category": rollCategories[i],
+          "category": staticCategories[i],
         });
       }
       
@@ -155,6 +164,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         "route": "/sets-browse-screen",
       });
       
+      // Добавляем категорию "Другое" для соусов, напитков и других товаров
+      dynamicCategories.add({
+        "id": 200,
+        "name": "Другое",
+        "icon": "category",
+        "color": Color(0xFF607D8B),
+        "route": "/menu-browse-screen",
+        "category": "other",
+      });
+      
       // Проверяем, что данные не null и не пустые
       if (rolls.isNotEmpty && sets.isNotEmpty) {
         setState(() {
@@ -163,14 +182,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           favoriteItems = favorites;
           categories = dynamicCategories;
         });
-        print('✅ Данные успешно загружены: ${popularSushi.length} роллов, ${popularSets.length} сетов, ${categories.length} категорий');
+        print('✅ Данные успешно загружены: ${popularSushi.length} роллов, ${popularSets.length} сетов, ${categories.length} категорий (включая "Другое")');
       } else {
         print('⚠️ Получены пустые данные: роллы: ${rolls.length}, сеты: ${sets.length}');
-        print('💡 Проверьте, что CSV файлы находятся в папке assets/data/');
+        print('💡 Проверьте, что API сервер работает и возвращает данные');
       }
     } catch (e) {
       print('❌ Ошибка загрузки данных: $e');
-      print('💡 Проверьте, что CSV файлы находятся в папке assets/data/');
+      print('💡 Проверьте, что API сервер работает и доступен');
     } finally {
       if (mounted) {
         setState(() {

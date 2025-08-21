@@ -7,10 +7,12 @@ import '../presentation/shopping_cart_screen/shopping_cart_screen.dart';
 import '../presentation/favorites_screen/favorites_screen.dart';
 import '../presentation/home_screen/home_screen.dart';
 import '../presentation/product_detail_screen/product_detail_screen.dart';
+import '../presentation/set_detail_screen/set_detail_screen.dart';
 import '../presentation/auth_screen/auth_screen.dart';
 import '../presentation/auth/login_screen.dart';
 import '../presentation/auth/register_screen.dart';
 import '../presentation/debug/debug_page.dart';
+import '../presentation/admin_screen/admin_screen.dart';
 
 class AppRoutes {
   // TODO: Add your routes here
@@ -24,9 +26,11 @@ class AppRoutes {
   static const String favoritesScreen = '/favorites-screen';
   static const String homeScreen = '/home-screen';
   static const String productDetailScreen = '/product-detail-screen';
+  static const String setDetailScreen = '/set-detail-screen';
   static const String loginScreen = '/login-screen';
   static const String registerScreen = '/register-screen';
   static const String debugPage = '/debug-page';
+  static const String adminScreen = '/admin-screen';
 
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const HomeScreen(),
@@ -39,9 +43,11 @@ class AppRoutes {
     favoritesScreen: (context) => const FavoritesScreen(),
     homeScreen: (context) => const HomeScreen(),
     productDetailScreen: (context) => const ProductDetailScreen(),
+    setDetailScreen: (context) => const SetDetailScreen(setId: 1), // Заглушка, setId будет передаваться через Navigator
     loginScreen: (context) => const LoginScreen(),
     registerScreen: (context) => const RegisterScreen(),
     debugPage: (context) => const DebugPage(),
+    adminScreen: (context) => const AdminScreen(),
     // TODO: Add your other routes here
   };
 }

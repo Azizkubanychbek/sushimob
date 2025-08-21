@@ -7,7 +7,7 @@ class ApiUserService {
   factory ApiUserService() => _instance;
   ApiUserService._internal();
 
-  static const String _baseUrl = 'http://172.16.4.51:5000/api'; // Updated to real IP
+  static const String _baseUrl = 'http://localhost:5000/api'; // Localhost для разработки
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };

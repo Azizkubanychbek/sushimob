@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import '../models/user.dart';
 import 'api_user_service.dart';
+import 'api_service.dart';
 
 class AuthResult {
   final bool success;
@@ -157,6 +158,10 @@ class AuthService {
       print('🚪 Выход из системы...');
       _currentUser = null;
       _currentSessionToken = null;
+      
+      // Очищаем токен в ApiService
+      ApiService.logout();
+      
       print('✅ Выход выполнен');
     } catch (e) {
       print('❌ Ошибка при выходе: $e');
@@ -172,6 +177,9 @@ class AuthService {
       
       _currentUser = user;
       _currentSessionToken = accessToken;
+      
+      // Устанавливаем токен в ApiService для админ API
+      ApiService.setAuthToken(accessToken);
 
       print('✅ Сессия создана для ${user.name} через API');
       print('👤 Текущий пользователь: ${_currentUser?.name}');

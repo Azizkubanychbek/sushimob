@@ -3,8 +3,9 @@ import os
 
 def check_database():
     db_paths = [
-        'sushi_express.db',
-        'instance/sushi_express.db'
+        'instance/sushi_express.db',
+        'backend/instance/sushi_express.db',
+        'sushi_express.db'
     ]
     
     for db_path in db_paths:

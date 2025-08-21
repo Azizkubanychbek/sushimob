@@ -10,6 +10,7 @@ class User {
   final DateTime createdAt;
   final DateTime? lastLoginAt;
   final bool isActive;
+  final bool isAdmin;
 
   User({
     this.id,
@@ -23,6 +24,7 @@ class User {
     required this.createdAt,
     this.lastLoginAt,
     this.isActive = true,
+    this.isAdmin = false,
   });
 
   // Копирование с изменениями для редактирования
@@ -38,6 +40,7 @@ class User {
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isActive,
+    bool? isAdmin,
   }) {
     return User(
       id: id ?? this.id,
@@ -49,8 +52,9 @@ class User {
       favorites: favorites ?? this.favorites, // Добавляю избранное
       passwordHash: passwordHash ?? this.passwordHash,
       createdAt: createdAt ?? this.createdAt,
-      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
-      isActive: isActive ?? this.isActive,
+              lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+        isActive: isActive ?? this.isActive,
+        isAdmin: isAdmin ?? this.isAdmin,
     );
   }
 
@@ -65,8 +69,9 @@ class User {
       'favorites': favorites, // Добавляю избранное
       'password_hash': passwordHash,
       'created_at': createdAt.toIso8601String(),
-      'last_login_at': lastLoginAt?.toIso8601String(),
-      'is_active': isActive ? 1 : 0,
+              'last_login_at': lastLoginAt?.toIso8601String(),
+        'is_active': isActive ? 1 : 0,
+        'is_admin': isAdmin ? 1 : 0,
     };
   }
 
@@ -81,10 +86,11 @@ class User {
       favorites: map['favorites'], // Добавляю избранное
       passwordHash: map['password_hash'] ?? '',
       createdAt: DateTime.parse(map['created_at']),
-      lastLoginAt: map['last_login_at'] != null 
-          ? DateTime.parse(map['last_login_at']) 
-          : null,
-      isActive: (map['is_active'] ?? 1) == 1,
+              lastLoginAt: map['last_login_at'] != null 
+            ? DateTime.parse(map['last_login_at']) 
+            : null,
+        isActive: (map['is_active'] ?? 1) == 1,
+        isAdmin: (map['is_admin'] ?? 0) == 1,
     );
   }
 
@@ -106,6 +112,7 @@ class User {
           ? DateTime.parse(json['last_login_at']) 
           : null,
       isActive: json['is_active'] ?? true,
+      isAdmin: json['is_admin'] ?? false,
     );
   }
 
@@ -121,6 +128,7 @@ class User {
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'is_active': isActive,
+      'is_admin': isAdmin,
     };
   }
 
@@ -138,6 +146,7 @@ class User {
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'is_active': isActive,
+      'is_admin': isAdmin,
     };
   }
 
@@ -154,12 +163,16 @@ class User {
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'is_active': isActive,
+      'is_admin': isAdmin,
     };
   }
 
+  // Геттер для совместимости с address
+  String? get address => location;
+
   @override
   String toString() {
-    return 'User(id: $id, name: $name, email: $email, phone: $phone, location: $location, loyaltyPoints: $loyaltyPoints, isActive: $isActive)';
+    return 'User(id: $id, name: $name, email: $email, phone: $phone, location: $location, loyaltyPoints: $loyaltyPoints, isActive: $isActive, isAdmin: $isAdmin)';
   }
 
   @override

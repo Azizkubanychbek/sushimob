@@ -34,16 +34,18 @@ class AppRoll {
     // Проверяем все поля на null и пустые значения
     final safeName = roll.name.isNotEmpty ? roll.name : 'Ролл ${roll.id}';
     final safePrice = roll.salePrice > 0 ? roll.salePrice : 100.0;
+    final safeDescription = roll.description.isNotEmpty ? roll.description : _generateDescription(safeName);
+    final safeImageUrl = roll.imageUrl.isNotEmpty ? roll.imageUrl : _getDefaultImage(safeName);
     
     return AppRoll(
       id: roll.id,
       name: safeName,
       price: safePrice,
-      description: _generateDescription(safeName),
-      imageUrl: _getDefaultImage(safeName),
+      description: safeDescription,
+      imageUrl: safeImageUrl,
       category: 'Роллы',
-      isPopular: isPopular,
-      isNew: isNew,
+      isPopular: roll.isPopular || isPopular,
+      isNew: roll.isNew || isNew,
       rating: 4.5 + (roll.id % 5) * 0.1,
       preparationTime: 15 + (roll.id % 10),
       originalPrice: safePrice,

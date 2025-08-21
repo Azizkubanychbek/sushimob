@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'widgets/profile_section_widget.dart';
-import 'widgets/profile_setting_item_widget.dart';
+import 'widgets/profile_info_widget.dart';
 
 class UserProfileScreen extends StatelessWidget {
   const UserProfileScreen({super.key});
@@ -15,29 +15,20 @@ class UserProfileScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ProfileSectionWidget(),
             const SizedBox(height: 24),
-            ProfileSettingItemWidget(
-              icon: Icons.person,
-              title: 'Личная информация',
+            Text(
+              'Личная информация',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).primaryColor,
+              ),
             ),
-            ProfileSettingItemWidget(
-              icon: Icons.location_on,
-              title: 'Адреса доставки',
-            ),
-            ProfileSettingItemWidget(
-              icon: Icons.payment,
-              title: 'Способы оплаты',
-            ),
-            ProfileSettingItemWidget(
-              icon: Icons.history,
-              title: 'История заказов',
-            ),
-            ProfileSettingItemWidget(
-              icon: Icons.settings,
-              title: 'Настройки',
-            ),
+            const SizedBox(height: 16),
+            ProfileInfoSection(),
           ],
         ),
       ),

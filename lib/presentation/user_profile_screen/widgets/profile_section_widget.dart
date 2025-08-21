@@ -16,6 +16,17 @@ class _ProfileSectionWidgetState extends State<ProfileSectionWidget> {
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
     final isLoggedIn = _authService.isLoggedIn;
+    
+    // Если пользователь не авторизован, перенаправляем на страницу входа
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!isLoggedIn) {
+        Navigator.pushNamedAndRemoveUntil(
+          context, 
+          '/login-screen',
+          (route) => false,
+        );
+      }
+    });
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -109,6 +120,30 @@ class _ProfileSectionWidgetState extends State<ProfileSectionWidget> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                
+                // Кнопка админ-панели (только для админов)
+                if (isLoggedIn && user!.isAdmin) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/admin-screen');
+                      },
+                      icon: const Icon(Icons.admin_panel_settings),
+                      label: const Text('Админ-панель'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: BorderSide(color: Colors.orange),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -121,6 +156,12 @@ class _ProfileSectionWidgetState extends State<ProfileSectionWidget> {
                             content: Text('Вы вышли из системы'),
                             backgroundColor: Colors.green,
                           ),
+                        );
+                        // Перенаправляем на страницу входа после выхода
+                        Navigator.pushNamedAndRemoveUntil(
+                          context, 
+                          '/login-screen',
+                          (route) => false, // Убираем все предыдущие страницы из стека
                         );
                       } else {
                         Navigator.pushNamed(context, '/login-screen');

@@ -1,15 +1,25 @@
+import 'app_roll.dart';
+
 class Roll {
   final int id;
   final String name;
+  final String description;
   final double salePrice;
-  final double costPrice; // Changed from cost
+  final double costPrice;
+  final String imageUrl;
+  final bool isPopular;
+  final bool isNew;
   final List<RollIngredient>? ingredients;
 
   Roll({
     required this.id,
     required this.name,
+    this.description = '',
     required this.salePrice,
-    required this.costPrice, // Changed from cost
+    required this.costPrice,
+    this.imageUrl = '',
+    this.isPopular = false,
+    this.isNew = false,
     this.ingredients,
   });
 
@@ -17,8 +27,12 @@ class Roll {
     return Roll(
       id: json['id']?.toInt() ?? 0,
       name: json['name'] ?? '',
+      description: json['description'] ?? '',
       salePrice: (json['sale_price'] ?? 0.0).toDouble(),
-      costPrice: (json['cost_price'] ?? 0.0).toDouble(), // Changed from cost
+      costPrice: (json['cost_price'] ?? 0.0).toDouble(),
+      imageUrl: json['image_url'] ?? '',
+      isPopular: json['is_popular'] ?? false,
+      isNew: json['is_new'] ?? false,
       ingredients: json['ingredients'] != null
           ? (json['ingredients'] as List)
               .map((e) => RollIngredient.fromJson(e))
@@ -31,15 +45,24 @@ class Roll {
     return {
       'id': id,
       'name': name,
+      'description': description,
       'sale_price': salePrice,
-      'cost_price': costPrice, // Changed from cost
+      'cost_price': costPrice,
+      'image_url': imageUrl,
+      'is_popular': isPopular,
+      'is_new': isNew,
       'ingredients': ingredients?.map((e) => e.toJson()).toList(),
     };
   }
 
+  // Метод для конвертации в AppRoll
+  AppRoll toAppRoll() {
+    return AppRoll.fromRoll(this, isPopular: isPopular, isNew: isNew);
+  }
+
   @override
   String toString() {
-    return 'Roll(id: $id, name: $name, salePrice: $salePrice, costPrice: $costPrice)'; // Changed from cost
+    return 'Roll(id: $id, name: $name, salePrice: $salePrice, costPrice: $costPrice)';
   }
 }
 
