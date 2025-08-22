@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/app_roll.dart';
 import '../../models/app_set.dart';
 import '../../services/api_sushi_service.dart'; // Заменяем на API сервис
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_image_widget.dart';
 import 'widgets/add_to_cart_button_widget.dart';
@@ -35,6 +36,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int quantity = 1;
   int? _productId;
   String? _productType;
+  List<Map<String, dynamic>> rollRecipe = [];
 
   @override
   void initState() {
@@ -76,8 +78,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         });
       } else {
         final loadedRoll = await ApiSushiService.getRollById(_productId!);
+        // Загружаем рецептуру ролла
+        List<Map<String, dynamic>> recipe = [];
+        try {
+          final recipeResponse = await ApiService.getRollRecipe(_productId!);
+          recipe = List<Map<String, dynamic>>.from(recipeResponse['ingredients'] ?? []);
+        } catch (e) {
+          print('Ошибка загрузки рецептуры: $e');
+        }
+        
         setState(() {
           roll = loadedRoll;
+          rollRecipe = recipe;
           isLoading = false;
         });
       }
@@ -242,6 +254,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       'Время приготовления: ${roll!.formattedPreparationTime}',
                       style: const TextStyle(fontSize: 16),
                     ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Состав ролла:',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (rollRecipe.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Состав ролла временно недоступен',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      )
+                    else
+                      ...rollRecipe.map((ingredient) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                ingredient['ingredient_name'] ?? 'Неизвестный ингредиент',
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            Text(
+                              '${ingredient['quantity']} ${ingredient['unit'] ?? 'г'}',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
                   ],
                   
                   // Дополнительная информация для сетов
@@ -342,28 +401,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
             const SizedBox(width: 16),
-            // Кнопка добавления в корзину
+            // Кнопки добавления в избранное и корзину
             Expanded(
-              child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('$productName ($quantity шт.) добавлен в корзину'),
-                    ),
-                  );
+              child: AddToCartButtonWidget(
+                itemType: isRoll ? 'roll' : 'set',
+                itemId: isRoll ? roll!.id : set!.id,
+                itemName: productName,
+                onSuccess: () {
+                  setState(() {
+                    // Обновляем UI после успешного добавления
+                  });
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: Text(
-                  'Добавить в корзину ${(isRoll ? roll!.price : set!.price) * quantity}₽',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
               ),
             ),
           ],

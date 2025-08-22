@@ -11,7 +11,7 @@ class CartService {
     _initialize();
   }
 
-  static const String _baseUrl = 'http://172.16.4.51:5000/api'; // Updated to real IP
+  static const String _baseUrl = 'http://127.0.0.1:5000/api';
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };

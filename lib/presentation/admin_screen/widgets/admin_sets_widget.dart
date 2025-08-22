@@ -68,6 +68,9 @@ class _AdminSetsWidgetState extends State<AdminSetsWidget> {
 
   void _showAddSetDialog() {
     _resetForm();
+    // Устанавливаем начальные значения для нового сета
+    _costPriceController.text = '0.0'; // Начальная себестоимость
+    _setPriceController.text = '0.0';  // Начальная цена продажи
     _showSetDialog(isEditing: false);
   }
 
@@ -124,9 +127,9 @@ class _AdminSetsWidgetState extends State<AdminSetsWidget> {
                 ElevatedButton.icon(
                   onPressed: _editingSet != null ? () => _showCompositionEditor() : null,
                   icon: const Icon(Icons.list_alt),
-                  label: const Text('Редактировать состав сета'),
+                  label: Text(_editingSet != null ? 'Редактировать состав сета' : 'Создайте сет для редактирования'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.purple,
+                    backgroundColor: _editingSet != null ? Colors.purple : Colors.grey,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -236,8 +239,33 @@ class _AdminSetsWidgetState extends State<AdminSetsWidget> {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      final costPrice = double.parse(_costPriceController.text);
-      final setPrice = double.parse(_setPriceController.text);
+      // Проверяем, что поля не пустые
+      if (_costPriceController.text.trim().isEmpty || _setPriceController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Заполните все обязательные поля'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Безопасно преобразуем строки в числа
+      final costPriceText = _costPriceController.text.trim();
+      final setPriceText = _setPriceController.text.trim();
+      
+      final costPrice = double.tryParse(costPriceText);
+      final setPrice = double.tryParse(setPriceText);
+      
+      if (costPrice == null || setPrice == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Введите корректные числовые значения для цен'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       
       // Автоматически рассчитываем скидку
       final discountPercent = costPrice > 0 ? ((costPrice - setPrice) / costPrice * 100).clamp(0.0, 100.0) : 0.0;
@@ -252,6 +280,8 @@ class _AdminSetsWidgetState extends State<AdminSetsWidget> {
         'is_popular': _isPopular,
         'is_new': _isNew,
       };
+
+      print('🔍 DEBUG: Отправляем данные сета: $setData');
 
       if (_editingSet != null) {
         // Обновление существующего сета
@@ -277,6 +307,7 @@ class _AdminSetsWidgetState extends State<AdminSetsWidget> {
       _resetForm();
       _loadSets();
     } catch (e) {
+      print('❌ Ошибка сохранения сета: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Ошибка: $e'),
@@ -450,42 +481,65 @@ class _AdminSetsWidgetState extends State<AdminSetsWidget> {
 
   void _showCompositionEditor() async {
     try {
-      // Загружаем текущий состав сета
-      final compositionResponse = await ApiService.getSetComposition(_editingSet!.id!);
-      final items = (compositionResponse['composition'] as List?) ?? [];
-      final currentComposition = items.map((item) {
-        return SetCompositionItem(
-          rollId: item['roll_id'] as int,
-          rollName: (item['roll_name'] ?? '').toString(),
-          rollCostPrice: (item['roll_cost_price'] as num).toDouble(),
-          rollSalePrice: (item['roll_sale_price'] as num).toDouble(),
-          quantity: (item['quantity'] as num).toInt(),
+      if (_editingSet != null) {
+        // Редактирование существующего сета
+        final compositionResponse = await ApiService.getSetComposition(_editingSet!.id!);
+        print('🔍 DEBUG: Ответ API состава сета: $compositionResponse');
+        
+        // Проверяем структуру ответа
+        final items = compositionResponse['composition'] as List? ?? [];
+        print('🔍 DEBUG: Найдено элементов в составе: ${items.length}');
+        
+        if (items.isNotEmpty) {
+          print('🔍 DEBUG: Первый элемент: ${items.first}');
+        }
+        
+        final currentComposition = items.map((item) {
+          print('🔍 DEBUG: Обрабатываем элемент: $item');
+          return SetCompositionItem(
+            itemId: item['roll_id'] as int? ?? 0,
+            itemName: (item['roll_name'] ?? '').toString(),
+            itemCostPrice: (item['roll_cost_price'] as num?)?.toDouble() ?? 0.0,
+            itemSalePrice: (item['roll_sale_price'] as num?)?.toDouble() ?? 0.0,
+            itemType: 'roll', // Пока только роллы из API
+            quantity: (item['quantity'] as num?)?.toInt() ?? 1,
+          );
+        }).toList();
+        
+        print('🔍 DEBUG: Создано элементов SetCompositionItem: ${currentComposition.length}');
+        
+        // Показываем редактор состава сета
+        final result = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => SetCompositionEditorWidget(
+            setId: _editingSet!.id!,
+            setName: _editingSet!.name,
+            currentComposition: currentComposition,
+          ),
         );
-      }).toList();
-      
-      // Показываем редактор состава сета
-      final result = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => SetCompositionEditorWidget(
-          setId: _editingSet!.id!,
-          setName: _editingSet!.name,
-          currentComposition: currentComposition,
-        ),
-      );
 
-      // Если состав был изменен, обновляем данные
-      if (result == true) {
-        await _loadSets(); // Перезагружаем сеты для обновления себестоимости
-        // Обновляем поля формы на случай, если описание/цены изменились после сохранения состава
-        if (_editingSet != null) {
+        // Если состав был изменен, обновляем данные
+        if (result == true) {
+          await _loadSets(); // Перезагружаем сеты для обновления себестоимости
+          // Обновляем поля формы на случай, если описание/цены изменились после сохранения состава
           final refreshed = _sets.firstWhere((s) => s.id == _editingSet!.id, orElse: () => _editingSet!);
           _descriptionController.text = refreshed.description ?? '';
           _costPriceController.text = refreshed.costPrice.toString();
           _setPriceController.text = refreshed.setPrice.toString();
         }
+      } else {
+        // Создание нового сета - сначала нужно создать сет
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Сначала создайте сет, а затем отредактируйте его состав'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
+      print('❌ Ошибка в _showCompositionEditor: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

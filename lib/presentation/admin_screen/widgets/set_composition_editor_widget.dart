@@ -2,24 +2,30 @@ import 'package:flutter/material.dart';
 import '../../../services/api_service.dart';
 
 class SetCompositionItem {
-  final int rollId;
-  final String rollName;
-  final double rollCostPrice;
-  final double rollSalePrice;
+  final int itemId;
+  final String itemName;
+  final double itemCostPrice;
+  final double itemSalePrice;
+  final String itemType; // 'roll' или 'other'
+  final String? itemCategory; // для других товаров (соусы, напитки)
   int quantity;
-  double get calculatedCost => rollCostPrice * quantity;
-  double get calculatedSalePrice => rollSalePrice * quantity;
+  
+  double get calculatedCost => itemCostPrice * quantity;
+  double get calculatedSalePrice => itemSalePrice * quantity;
 
   SetCompositionItem({
-    required this.rollId,
-    required this.rollName,
-    required this.rollCostPrice,
-    required this.rollSalePrice,
+    required this.itemId,
+    required this.itemName,
+    required this.itemCostPrice,
+    required this.itemSalePrice,
+    required this.itemType,
+    this.itemCategory,
     required this.quantity,
   });
 
   Map<String, dynamic> toJson() => {
-    'roll_id': rollId,
+    'item_id': itemId,
+    'item_type': itemType,
     'quantity': quantity,
   };
 }
@@ -60,17 +66,37 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
     try {
       setState(() => _isLoading = true);
       
+      // Загружаем роллы
       final rolls = await ApiService.getRolls();
-      _availableRolls = rolls.map((roll) => {
+      final rollsData = rolls.map((roll) => {
         'id': roll.id,
         'name': roll.name,
         'cost_price': roll.costPrice,
         'sale_price': roll.salePrice,
+        'type': 'roll',
+        'category': null,
       }).toList();
       
-      print('🍣 DEBUG: Загружено роллов: ${_availableRolls.length}');
+      // Загружаем другие товары
+      final otherItems = await ApiService.getOtherItems();
+      final otherItemsData = otherItems.map((item) => {
+        'id': item['id'],
+        'name': item['name'],
+        'cost_price': item['cost_price'],
+        'sale_price': item['sale_price'],
+        'type': 'other',
+        'category': item['category'],
+      }).toList();
+      
+      // Объединяем все доступные товары
+      _availableRolls = [...rollsData, ...otherItemsData];
+      
+      print('🍣 DEBUG: Загружено роллов: ${rollsData.length}');
+      print('🍣 DEBUG: Загружено других товаров: ${otherItemsData.length}');
+      print('🍣 DEBUG: Всего доступно товаров: ${_availableRolls.length}');
+      
       if (_availableRolls.isNotEmpty) {
-        print('🍣 DEBUG: Первый ролл: ${_availableRolls.first}');
+        print('🍣 DEBUG: Первый товар: ${_availableRolls.first}');
       }
       
       setState(() => _isLoading = false);
@@ -78,7 +104,7 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки роллов: $e')),
+          SnackBar(content: Text('Ошибка загрузки товаров: $e')),
         );
       }
     }
@@ -87,31 +113,47 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
   void _calculateTotalCost() {
     _totalCost = _composition.fold(0, (sum, item) => sum + item.calculatedCost);
     _totalSalePrice = _composition.fold(0, (sum, item) => sum + item.calculatedSalePrice);
+    
+    print('🔍 DEBUG: Пересчет стоимости. Элементов: ${_composition.length}');
+    print('🔍 DEBUG: Общая себестоимость: $_totalCost');
+    print('🔍 DEBUG: Общая цена продажи: $_totalSalePrice');
+    
+    for (int i = 0; i < _composition.length; i++) {
+      final item = _composition[i];
+      print('🔍 DEBUG: Элемент $i: ${item.itemName} x${item.quantity} = ${item.calculatedCost}₽ (себест.) / ${item.calculatedSalePrice}₽ (продажа)');
+    }
   }
 
   void _addRoll() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Добавить ролл в сет'),
+        title: const Text('Добавить товар в сет'),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Выберите ролл:'),
+              const Text('Выберите товар:'),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
                   itemCount: _availableRolls.length,
                   itemBuilder: (context, index) {
                     final roll = _availableRolls[index];
-                    final isAlreadyAdded = _composition.any((item) => item.rollId == roll['id']);
+                    final isAlreadyAdded = _composition.any((item) => item.itemId == roll['id']);
                     
                     return ListTile(
                       title: Text(roll['name']),
-                      subtitle: Text('${roll['sale_price']}₽'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${roll['sale_price']}₽'),
+                          if (roll['type'] == 'other' && roll['category'] != null)
+                            Text('${roll['category']}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        ],
+                      ),
                       trailing: isAlreadyAdded 
                         ? const Icon(Icons.check, color: Colors.green)
                         : const Icon(Icons.add),
@@ -136,16 +178,27 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
     );
   }
 
-  void _addRollToComposition(Map<String, dynamic> roll) {
+  void _addRollToComposition(Map<String, dynamic> item) {
+    print('🔍 DEBUG: Добавляем товар в состав: $item');
+    print('🔍 DEBUG: ID товара: ${item['id']}, Название: ${item['name']}, Тип: ${item['type']}');
+    
     setState(() {
-      _composition.add(SetCompositionItem(
-        rollId: roll['id'],
-        rollName: roll['name'],
-        rollCostPrice: roll['cost_price'].toDouble(),
-        rollSalePrice: roll['sale_price'].toDouble(),
+      final newItem = SetCompositionItem(
+        itemId: item['id'],
+        itemName: item['name'],
+        itemCostPrice: item['cost_price'].toDouble(),
+        itemSalePrice: item['sale_price'].toDouble(),
+        itemType: item['type'],
+        itemCategory: item['category'],
         quantity: 1, // По умолчанию 1 штука
-      ));
+      );
+      
+      print('🔍 DEBUG: Создан новый элемент: itemId=${newItem.itemId}, itemName=${newItem.itemName}, itemType=${newItem.itemType}');
+      
+      _composition.add(newItem);
       _calculateTotalCost();
+      
+      print('🔍 DEBUG: Товар добавлен. Всего в составе: ${_composition.length}');
     });
   }
 
@@ -166,7 +219,7 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
   Future<void> _saveComposition() async {
     if (_composition.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Добавьте хотя бы один ролл')),
+        const SnackBar(content: Text('Добавьте хотя бы один товар')),
       );
       return;
     }
@@ -175,10 +228,19 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
       setState(() => _isSaving = true);
       
       final compositionData = {
-        'rolls': _composition.map((item) => item.toJson()).toList(),
+        'items': _composition.map((item) => item.toJson()).toList(),
       };
 
-      await ApiService.updateSetComposition(widget.setId, compositionData);
+      print('🔍 DEBUG: Отправляем данные для сохранения: $compositionData');
+      print('🔍 DEBUG: Количество роллов в составе: ${_composition.length}');
+      
+      for (int i = 0; i < _composition.length; i++) {
+        final item = _composition[i];
+        print('🔍 DEBUG: Ролл $i: ID=${item.itemId}, Количество=${item.quantity}, JSON=${item.toJson()}');
+      }
+
+      final response = await ApiService.updateSetComposition(widget.setId, compositionData);
+      print('🔍 DEBUG: Ответ API на сохранение: $response');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -190,6 +252,7 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
         Navigator.of(context).pop(true); // Возвращаем true для обновления
       }
     } catch (e) {
+      print('❌ Ошибка сохранения состава сета: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -294,7 +357,7 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
                 ElevatedButton.icon(
                   onPressed: _addRoll,
                   icon: const Icon(Icons.add),
-                  label: const Text('Добавить ролл'),
+                  label: const Text('Добавить товар'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
@@ -340,7 +403,7 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Нажмите "Добавить ролл" для начала',
+                          'Нажмите "Добавить товар" для начала',
                           style: TextStyle(color: Colors.grey[500]),
                         ),
                       ],
@@ -360,7 +423,7 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
                               CircleAvatar(
                                 backgroundColor: Theme.of(context).primaryColor,
                                 child: Text(
-                                  item.rollName[0].toUpperCase(),
+                                  item.itemName[0].toUpperCase(),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -375,14 +438,14 @@ class _SetCompositionEditorWidgetState extends State<SetCompositionEditorWidget>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      item.rollName,
+                                      item.itemName,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
                                       ),
                                     ),
                                     Text(
-                                      '${item.rollSalePrice}₽ за штуку',
+                                      '${item.itemSalePrice}₽ за штуку',
                                       style: TextStyle(
                                         color: Colors.grey[600],
                                         fontSize: 12,

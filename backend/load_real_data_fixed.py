@@ -9,7 +9,7 @@ def load_real_data():
     """Загрузка реальных данных из Excel файлов sushiback в новую SQLite БД"""
     
     # Подключаемся к БД
-    conn = sqlite3.connect('sushi_express.db')
+    conn = sqlite3.connect('instance/sushi_express.db')
     cursor = conn.cursor()
     
     try:
@@ -50,7 +50,7 @@ def load_real_data():
         print("🥬 Загружаем ингредиенты из Excel...")
         
         # Путь к файлу ингредиентов
-        ingredients_file = '../sushiback/ingredients.xlsx'
+        ingredients_file = 'assets/data/ingredients.xlsx'
         
         if os.path.exists(ingredients_file):
             df = pd.read_excel(ingredients_file)
@@ -97,7 +97,7 @@ def load_real_data():
         print("🍣 Загружаем роллы из Excel...")
         
         # Путь к файлу роллов
-        rolls_file = '../sushiback/rolls.xlsx'
+        rolls_file = 'assets/data/rolls.xlsx'
         
         if os.path.exists(rolls_file):
             df = pd.read_excel(rolls_file)
@@ -176,7 +176,7 @@ def load_real_data():
         print("📦 Загружаем сеты из Excel...")
         
         # Путь к файлу сетов
-        sets_file = '../sushiback/sets.xlsx'
+        sets_file = 'assets/data/sets.xlsx'
         
         if os.path.exists(sets_file):
             df = pd.read_excel(sets_file)
@@ -225,7 +225,7 @@ def load_real_data():
         print("🔗 Создаем состав сетов...")
         
         # Путь к файлу состава сетов
-        set_composition_file = '../sushiback/set_composition.xlsx'
+        set_composition_file = 'assets/data/set_composition.xlsx'
         
         if os.path.exists(set_composition_file):
             df = pd.read_excel(set_composition_file)

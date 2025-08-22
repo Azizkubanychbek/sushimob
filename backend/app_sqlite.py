@@ -1436,7 +1436,7 @@ def admin_update_set_composition(set_id):
             return jsonify({'error': 'Доступ запрещен'}), 403
         
         data = request.get_json()
-        rolls = data.get('rolls', [])
+        items = data.get('items', [])
         
         # Удаляем старый состав
         db.session.execute(text("DELETE FROM set_rolls WHERE set_id = :set_id"), {'set_id': set_id})
@@ -1446,26 +1446,27 @@ def admin_update_set_composition(set_id):
         total_sale_price = 0
         composition_for_description = []
         
-        for roll_data in rolls:
-            roll_id = roll_data['roll_id']
-            quantity = roll_data['quantity']
+        for item_data in items:
+            item_id = item_data['item_id']
+            item_type = item_data['item_type']
+            quantity = item_data['quantity']
             
-            # Добавляем в состав
-            db.session.execute(text("""
-                INSERT INTO set_rolls (set_id, roll_id, quantity)
-                VALUES (:set_id, :roll_id, :quantity)
-            """), {'set_id': set_id, 'roll_id': roll_id, 'quantity': quantity})
-            
-            # Получаем цены ролла для расчета
-            roll_query = text("SELECT cost_price, sale_price FROM rolls WHERE id = :roll_id")
-            roll_result = db.session.execute(roll_query, {'roll_id': roll_id}).fetchone()
-            if roll_result:
-                total_cost += roll_result.cost_price * quantity
-                total_sale_price += roll_result.sale_price * quantity
-                # Для описания сета
-                name_row = db.session.execute(text("SELECT name FROM rolls WHERE id = :roll_id"), {'roll_id': roll_id}).fetchone()
-                if name_row:
-                    composition_for_description.append(f"{name_row.name} x{quantity}")
+            # Пока поддерживаем только роллы (другие товары можно добавить позже)
+            if item_type == 'roll':
+                # Добавляем в состав
+                db.session.execute(text("""
+                    INSERT INTO set_rolls (set_id, roll_id, quantity)
+                    VALUES (:set_id, :roll_id, :quantity)
+                """), {'set_id': set_id, 'roll_id': item_id, 'quantity': quantity})
+                
+                # Получаем цены ролла для расчета
+                roll_query = text("SELECT cost_price, sale_price, name FROM rolls WHERE id = :roll_id")
+                roll_result = db.session.execute(roll_query, {'roll_id': item_id}).fetchone()
+                if roll_result:
+                    total_cost += roll_result.cost_price * quantity
+                    total_sale_price += roll_result.sale_price * quantity
+                    # Для описания сета
+                    composition_for_description.append(f"{roll_result.name} x{quantity}")
         
         # Обновляем цены сета (со скидкой 10%)
         set_sale_price = total_sale_price * 0.9

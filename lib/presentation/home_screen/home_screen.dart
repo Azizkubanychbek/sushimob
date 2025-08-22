@@ -15,6 +15,7 @@ import './widgets/loyalty_points_widget.dart';
 import './widgets/popular_sushi_card_widget.dart';
 import './widgets/quick_reorder_card_widget.dart';
 import './widgets/recommended_item_widget.dart';
+import '../../widgets/unified_product_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -95,12 +96,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       final rolls = await ApiSushiService.getPopularRolls();
       final sets = await ApiSushiService.getPopularSets();
-      // Убираем CsvDataService.getCategories() и используем статические категории
-      // final rollCategories = await CsvDataService.getCategories();
       
-      // Загружаем избранное
+      // Загружаем избранное (не блокируем UI)
       final favoritesService = FavoritesService();
-      await favoritesService.loadFavorites();
+      favoritesService.loadFavorites(); // Убираем await
       final favorites = favoritesService.favoriteItems;
       
       print('🔍 DEBUG: Получено роллов: ${rolls.length}, сетов: ${sets.length}, избранного: ${favorites.length}');
@@ -174,23 +173,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         "category": "other",
       });
       
-      // Проверяем, что данные не null и не пустые
-      if (rolls.isNotEmpty && sets.isNotEmpty) {
-        setState(() {
-          popularSushi = rolls.take(6).toList();
-          popularSets = sets.take(3).toList();
-          favoriteItems = favorites;
-          categories = dynamicCategories;
-        });
-        print('✅ Данные успешно загружены: ${popularSushi.length} роллов, ${popularSets.length} сетов, ${categories.length} категорий (включая "Другое")');
-      } else {
-        print('⚠️ Получены пустые данные: роллы: ${rolls.length}, сеты: ${sets.length}');
-        print('💡 Проверьте, что API сервер работает и возвращает данные');
-      }
+      // Всегда устанавливаем данные, даже если они пустые
+      setState(() {
+        popularSushi = rolls.take(6).toList();
+        popularSets = sets.take(3).toList();
+        favoriteItems = favorites;
+        categories = dynamicCategories;
+        _isLoading = false;
+      });
+      
+      print('✅ Данные успешно загружены: ${popularSushi.length} роллов, ${popularSets.length} сетов, ${categories.length} категорий');
+      
     } catch (e) {
       print('❌ Ошибка загрузки данных: $e');
       print('💡 Проверьте, что API сервер работает и доступен');
-    } finally {
+      
+      // Даже при ошибке сбрасываем состояние загрузки
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -451,6 +449,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           SizedBox(height: 3.h),
                           _buildPopularSushiSection(),
                           SizedBox(height: 2.h),
+                          _buildPopularSetsSection(),
+                          SizedBox(height: 2.h),
                           _buildFavoritesSection(),
                           SizedBox(height: 2.h),
                           _buildRecommendedSection(),
@@ -623,25 +623,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildPopularSushiSection() {
+    print('🔍 DEBUG: _buildPopularSushiSection вызван');
+    print('🔍 DEBUG: popularSushi.length = ${popularSushi.length}');
+    if (popularSushi.isNotEmpty) {
+      print('🔍 DEBUG: Первый ролл: ${popularSushi.first.name}');
+    }
+    
+    if (popularSushi.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4.w),
+            child: Text(
+              'Популярные роллы',
+              style: AppTheme.lightTheme.textTheme.headlineSmall,
+            ),
+          ),
+          SizedBox(height: 1.h),
+          Container(
+            height: 28.h,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.restaurant, size: 64, color: Colors.grey[400]),
+                  SizedBox(height: 16),
+                  Text(
+                    'Нет популярных роллов',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Попробуйте обновить страницу',
+                    style: TextStyle(color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 4.w),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Popular Sushi Rolls',
-                style: AppTheme.lightTheme.textTheme.headlineSmall,
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/menu-browse-screen');
-                },
-                child: Text('See All'),
-              ),
-            ],
+          child: Text(
+            'Популярные роллы',
+            style: AppTheme.lightTheme.textTheme.headlineSmall,
           ),
         ),
         SizedBox(height: 1.h),
@@ -654,26 +689,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             itemBuilder: (context, index) {
               final sushi = popularSushi[index];
               
+              print('🔍 DEBUG: Рендерим ролл $index: ${sushi.name}');
+              
               // Защита от null значений
               if (sushi == null) return const SizedBox.shrink();
               
-              // Безопасно преобразуем AppRoll в Map
-              final sushiMap = <String, dynamic>{
-                'id': sushi.id,
-                'name': sushi.name.isNotEmpty ? sushi.name : 'Ролл ${sushi.id}',
-                'price': sushi.formattedPrice,
-                'image': sushi.imageUrl.isNotEmpty ? sushi.imageUrl : 'https://images.pexels.com/photos/357756/pexels-photo-357756.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-                'rating': sushi.formattedRating,
-                'isFavorite': false, // По умолчанию не в избранном
-                'isNew': sushi.isNew,
-                'isPopular': sushi.isPopular,
-                'description': sushi.description.isNotEmpty ? sushi.description : 'Вкусный ролл',
-              };
-              
               return PopularSushiCardWidget(
-                sushi: sushiMap,
-                onAddToCart: () => _onAddToCart(sushi),
-                onLongPress: () => _onItemLongPress(sushi),
+                roll: sushi,
                 onTap: () {
                   Navigator.pushNamed(
                     context, 
@@ -902,7 +924,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildRecommendedSection() {
-    final favoritesService = FavoritesService();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -941,15 +962,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   itemCount: popularSushi.take(4).length,
                   itemBuilder: (context, index) {
                     final roll = popularSushi[index];
-                    final item = {
-                      "id": roll.id,
-                      "name": roll.name,
-                      "price": roll.formattedPrice,
-                      "rating": roll.rating,
-                      "image": roll.imageUrl,
-                      "isNew": roll.isNew,
-                    };
-                    return GestureDetector(
+                    return UnifiedProductCard(
+                      product: roll,
                       onTap: () {
                         Navigator.pushNamed(
                           context, 
@@ -960,120 +974,109 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         );
                       },
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(12),
-                                  ),
-                                  image: DecorationImage(
-                                    image: NetworkImage(roll.imageUrl.isNotEmpty ? roll.imageUrl : 'https://images.pexels.com/photos/357756/pexels-photo-357756.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      roll.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.star, size: 16, color: Colors.amber[600]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          roll.formattedRating,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Spacer(),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          roll.formattedPrice,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green,
-                                          ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            // Кнопка "Добавить в избранное"
-                                            IconButton(
-                                              onPressed: () async {
-                                                final favoritesService = FavoritesService();
-                                                final success = await favoritesService.toggleFavorite(
-                                                  itemType: 'roll',
-                                                  itemId: roll.id,
-                                                );
-                                                
-                                                if (success) {
-                                                  // Обновляем UI через перезагрузку данных
-                                                  _loadData();
-                                                }
-                                              },
-                                              icon: Icon(
-                                                favoritesService.isInFavorites('roll', roll.id) 
-                                                    ? Icons.favorite 
-                                                    : Icons.favorite_border,
-                                                color: favoritesService.isInFavorites('roll', roll.id) 
-                                                    ? Colors.red 
-                                                    : Colors.grey,
-                                              ),
-                                              iconSize: 20,
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                            ),
-                                            // Кнопка "Добавить в корзину"
-                                            IconButton(
-                                              onPressed: () => _onAddToCart(roll),
-                                              icon: const Icon(Icons.add_circle),
-                                              iconSize: 20,
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      showRating: true,
                     );
                   },
                 ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPopularSetsSection() {
+    print('🔍 DEBUG: _buildPopularSetsSection вызван');
+    print('🔍 DEBUG: popularSets.length = ${popularSets.length}');
+    if (popularSets.isNotEmpty) {
+      print('🔍 DEBUG: Первый сет: ${popularSets.first.name}');
+    }
+    
+    if (popularSets.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4.w),
+            child: Text(
+              'Популярные сеты',
+              style: AppTheme.lightTheme.textTheme.headlineSmall,
+            ),
+          ),
+          SizedBox(height: 1.h),
+          Container(
+            height: 28.h,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.set_meal, size: 64, color: Colors.grey[400]),
+                  SizedBox(height: 16),
+                  Text(
+                    'Нет популярных сетов',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Попробуйте обновить страницу',
+                    style: TextStyle(color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4.w),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Популярные сеты',
+                style: AppTheme.lightTheme.textTheme.headlineSmall,
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/sets-browse-screen');
+                },
+                child: Text('Все сеты'),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 1.h),
+        Container(
+          height: 28.h,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 4.w),
+            itemCount: popularSets.length,
+            itemBuilder: (context, index) {
+              final set = popularSets[index];
+              
+              print('🔍 DEBUG: Рендерим сет $index: ${set.name}');
+              
+              return RecommendedItemWidget(
+                set: set,
+                onTap: () {
+                  Navigator.pushNamed(
+                    context, 
+                    '/set-detail-screen',
+                    arguments: {
+                      'setId': set.id,
+                    }
+                  );
+                },
+              );
+            },
+          ),
         ),
       ],
     );

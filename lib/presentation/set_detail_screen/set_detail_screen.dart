@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import '../../models/app_set.dart';
 import '../../services/api_sushi_service.dart';
 import '../../services/cart_service.dart';
+import '../../services/favorites_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_error_widget.dart';
+import '../../widgets/unified_product_card.dart';
+import '../product_detail_screen/widgets/add_to_cart_button_widget.dart';
 
 class SetDetailScreen extends StatefulWidget {
   final int setId;
@@ -40,8 +43,8 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
       // Загружаем детали сета
       final set = await ApiSushiService.getSetById(widget.setId);
       
-      // Загружаем состав сета (пока заглушка)
-      final composition = <Map<String, dynamic>>[];
+      // Загружаем состав сета
+      final composition = await ApiSushiService.getSetComposition(widget.setId);
 
       setState(() {
         _set = set;
@@ -248,7 +251,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      item['name'] ?? 'Неизвестный продукт',
+                                      item['roll_name'] ?? 'Неизвестный ролл',
                                       style: const TextStyle(fontWeight: FontWeight.w500),
                                     ),
                                   ),
@@ -316,26 +319,15 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                 
                                 const SizedBox(height: 16),
                                 
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: _addToCart,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(context).colorScheme.primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Добавить в корзину • ${(_set!.price * _quantity).toStringAsFixed(0)}₽',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
+                                AddToCartButtonWidget(
+                                  itemType: 'set',
+                                  itemId: _set!.id,
+                                  itemName: _set!.name,
+                                  onSuccess: () {
+                                    setState(() {
+                                      // Обновляем UI после успешного добавления
+                                    });
+                                  },
                                 ),
                               ],
                             ),
