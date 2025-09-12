@@ -21,7 +21,7 @@ app.config['JWT_SECRET_KEY'] = 'jwt-secret-string'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
 
 # Инициализация расширений
-from models import db, User, Ingredient, Roll, RollIngredient, Set, SetRoll, Order, OrderItem, OtherItem
+from models import db, User, Ingredient, Roll, RollIngredient, Set, SetRoll, Order, OrderItem, OtherItem, LoyaltyCard, LoyaltyRoll, LoyaltyCardUsage, ReferralUsage
 db.init_app(app)
 
 jwt = JWTManager()
@@ -66,19 +66,69 @@ def register():
         if existing_user:
             return jsonify({'error': 'Пользователь с таким email уже существует'}), 400
         
+        # Обработка реферального кода
+        referral_code = data.get('referral_code', '').strip().upper() if data.get('referral_code') else None
+        referrer_user = None
+        bonus_points = 0
+        
+        if referral_code:
+            # Проверяем, что код существует и активен
+            referrer_user = User.query.filter_by(referral_code=referral_code).first()
+            if not referrer_user:
+                return jsonify({'error': 'Неверный реферальный код'}), 400
+            
+            # Проверяем, что пользователь не приглашает сам себя
+            if referrer_user.email.lower() == data['email'].strip().lower():
+                return jsonify({'error': 'Нельзя использовать свой реферальный код'}), 400
+            
+            bonus_points = 200  # Бонусные баллы за регистрацию по реферальному коду
+        
         # Создание нового пользователя
         new_user = User(
             name=data['name'].strip(),
             email=data['email'].strip().lower(),
             phone=data['phone'].strip(),
             location=data.get('location', '').strip() if data.get('location') else None,
-            password_hash=generate_password_hash(data['password'])
+            password_hash=generate_password_hash(data['password']),
+            referred_by=referral_code,
+            bonus_points=bonus_points
         )
         
         db.session.add(new_user)
+        db.session.flush()  # Получаем ID пользователя
+        
+        # Генерируем реферальный код для нового пользователя
+        import random
+        import string
+        
+        def generate_referral_code():
+            return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        
+        # Генерируем уникальный реферальный код
+        while True:
+            new_referral_code = generate_referral_code()
+            existing_code = User.query.filter_by(referral_code=new_referral_code).first()
+            if not existing_code:
+                break
+        
+        new_user.referral_code = new_referral_code
+        
+        # Если использовался реферальный код, создаем запись об использовании
+        if referrer_user and referral_code:
+            referral_usage = ReferralUsage(
+                referrer_id=referrer_user.id,
+                referred_id=new_user.id,
+                referral_code=referral_code,
+                bonus_points_awarded=200
+            )
+            db.session.add(referral_usage)
+            
+            print(f"✅ Реферальный код {referral_code} использован. Приглашен: {new_user.name}, Пригласил: {referrer_user.name}")
+        
         db.session.commit()
         
         print(f"✅ Новый пользователь зарегистрирован: {new_user.name} ({new_user.email})")
+        print(f"✅ Реферальный код пользователя: {new_referral_code}")
         
         # Создание JWT токена
         access_token = create_access_token(identity=new_user.id)
@@ -172,6 +222,7 @@ def get_users():
         print(f"❌ Ошибка при получении пользователей: {e}")
         return jsonify({'error': f'Ошибка при получении пользователей: {str(e)}'}), 500
 
+@app.route('/api/profile', methods=['PUT'])
 @app.route('/api/profile/update', methods=['PUT'])
 @jwt_required()
 def update_profile():
@@ -305,7 +356,7 @@ def add_to_favorites():
         print(f"❌ Ошибка при добавлении в избранное: {e}")
         return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
-@app.route('/api/favorites/remove', methods=['POST'])
+@app.route('/api/favorites/remove', methods=['POST', 'DELETE'])
 @jwt_required()
 def remove_from_favorites():
     """Удаление ролла/сета из избранного"""
@@ -507,36 +558,134 @@ def create_order():
     """Создание нового заказа"""
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
         data = request.get_json()
+        
+        # Получаем данные из корзины пользователя
+        cart = json.loads(user.cart) if user.cart else []
+        
+        if not cart:
+            return jsonify({'error': 'Корзина пуста'}), 400
+        
+        # Подготавливаем данные заказа
+        phone = data.get('phone', user.phone)
+        delivery_address = data.get('delivery_address', user.location or '')
+        payment_method = data.get('payment_method', 'cash')
+        comment = data.get('comment', '')
+        
+        # Вычисляем общую стоимость из корзины
+        total_price = 0
+        has_paid_items = False  # Флаг для проверки наличия платных товаров
+        
+        for cart_item in cart:
+            item_type = cart_item['item_type']
+            item_id = cart_item['item_id']
+            quantity = cart_item['quantity']
+            
+            unit_price = 0
+            if item_type == 'roll':
+                roll = Roll.query.get(item_id)
+                if roll:
+                    unit_price = roll.sale_price
+                    has_paid_items = True
+            elif item_type == 'set':
+                set_item = Set.query.get(item_id)
+                if set_item:
+                    unit_price = set_item.set_price
+                    has_paid_items = True
+            elif item_type == 'loyalty_roll':
+                # Бесплатные роллы не влияют на общую стоимость
+                unit_price = 0.0
+            elif item_type == 'bonus_points':
+                # Бонусные баллы (скидка) - не считаем как платный товар
+                unit_price = cart_item.get('price', 0)  # Отрицательная цена
+            
+            total_price += unit_price * quantity
+        
+        # Если в корзине только бонусные баллы (скидки), не позволяем оформить заказ
+        if not has_paid_items:
+            return jsonify({'error': 'В корзине нет товаров для заказа'}), 400
+        
+        # Используем переданную сумму если она больше 0
+        if data.get('total_amount', 0) > 0:
+            total_price = data.get('total_amount', 0)
+        elif data.get('total_price', 0) > 0:
+            total_price = data.get('total_price', 0)
+        
+        # Валидация отрицательных сумм
+        if total_price < 0:
+            return jsonify({'error': 'Сумма заказа не может быть отрицательной'}), 400
+        
+        # Дополнительная валидация переданной суммы
+        if data.get('total_amount', 0) < 0 or data.get('total_price', 0) < 0:
+            return jsonify({'error': 'Переданная сумма заказа не может быть отрицательной'}), 400
         
         # Создаем заказ
         order = Order(
             user_id=user_id,
-            phone=data['phone'],
-            delivery_address=data['delivery_address'],
-            payment_method=data['payment_method'],
-            total_price=data['total_price'],
-            comment=data.get('comment', '')
+            phone=phone,
+            delivery_address=delivery_address,
+            payment_method=payment_method,
+            total_price=total_price,
+            comment=comment
         )
         
         db.session.add(order)
         db.session.flush()  # Получаем ID заказа
         
-        # Добавляем элементы заказа
-        for item_data in data['items']:
+        # Добавляем элементы заказа из корзины
+        for cart_item in cart:
+            # Получаем данные товара
+            item_type = cart_item['item_type']
+            item_id = cart_item['item_id']
+            quantity = cart_item['quantity']
+            
+            # Вычисляем цены
+            unit_price = 0
+            if item_type == 'roll':
+                roll = Roll.query.get(item_id)
+                if roll:
+                    unit_price = roll.sale_price
+            elif item_type == 'set':
+                set_item = Set.query.get(item_id)
+                if set_item:
+                    unit_price = set_item.set_price
+            elif item_type == 'loyalty_roll':
+                # Бесплатные роллы из накопительных карт
+                roll = Roll.query.get(item_id)
+                if roll:
+                    unit_price = 0.0  # Бесплатно
+            elif item_type == 'bonus_points':
+                # Бонусные баллы (скидка) - не создаем OrderItem для них
+                continue
+            
+            total_item_price = unit_price * quantity
+            
             order_item = OrderItem(
                 order_id=order.id,
-                item_type=item_data['type'],  # 'roll' или 'set'
-                item_id=item_data['id'],
-                quantity=item_data['quantity'],
-                unit_price=item_data['unit_price'],
-                total_price=item_data['total_price']
+                item_type=item_type,
+                item_id=item_id,
+                quantity=quantity,
+                unit_price=unit_price,
+                total_price=total_item_price
             )
             db.session.add(order_item)
+        
+        # Очищаем корзину после создания заказа
+        user.cart = '[]'
+        
+        # Обрабатываем накопительную карту
+        process_loyalty_card(user_id, total_price)
         
         db.session.commit()
         
         print(f"✅ Новый заказ создан: ID {order.id}, пользователь {user_id}")
+        print(f"📦 Товаров в заказе: {len(cart)}")
+        print(f"💰 Общая стоимость: {total_price}₽")
         
         return jsonify({
             'success': True,
@@ -547,6 +696,170 @@ def create_order():
     except Exception as e:
         db.session.rollback()
         print(f"❌ Ошибка при создании заказа: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+# ===== API для накопительных карт =====
+@app.route('/api/loyalty/cards', methods=['GET'])
+@jwt_required()
+def get_loyalty_cards():
+    """Получение накопительных карт пользователя"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        # Получаем все карты пользователя
+        cards = LoyaltyCard.query.filter_by(user_id=user_id).order_by(LoyaltyCard.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'cards': [card.to_dict() for card in cards],
+            'total': len(cards)
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении накопительных карт: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/loyalty/available-rolls', methods=['GET'])
+@jwt_required()
+def get_available_loyalty_rolls():
+    """Получение доступных роллов для накопительной системы"""
+    try:
+        # Получаем доступные роллы
+        loyalty_rolls = LoyaltyRoll.query.filter_by(is_available=True).all()
+        
+        return jsonify({
+            'success': True,
+            'rolls': [lr.to_dict() for lr in loyalty_rolls],
+            'total': len(loyalty_rolls)
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении доступных роллов: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/loyalty/use-card', methods=['POST'])
+@jwt_required()
+def use_loyalty_card():
+    """Использование заполненной накопительной карты"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        data = request.get_json()
+        card_id = data.get('card_id')
+        roll_id = data.get('roll_id')
+        
+        if not card_id or not roll_id:
+            return jsonify({'error': 'ID карты и ролла обязательны'}), 400
+        
+        # Проверяем что карта принадлежит пользователю и заполнена
+        card = LoyaltyCard.query.filter_by(
+            id=card_id, 
+            user_id=user_id, 
+            is_completed=True
+        ).first()
+        
+        if not card:
+            return jsonify({'error': 'Карта не найдена или не заполнена'}), 404
+        
+        # Проверяем что ролл доступен для накопительной системы
+        loyalty_roll = LoyaltyRoll.query.filter_by(
+            roll_id=roll_id, 
+            is_available=True
+        ).first()
+        
+        if not loyalty_roll:
+            return jsonify({'error': 'Ролл недоступен для накопительной системы'}), 400
+        
+        # Получаем информацию о ролле
+        roll = Roll.query.get(roll_id)
+        if not roll:
+            return jsonify({'error': 'Ролл не найден'}), 404
+        
+        # Добавляем ролл в корзину пользователя с ценой 0₽
+        cart = json.loads(user.cart) if user.cart else []
+        
+        # Проверяем, есть ли уже такой ролл в корзине
+        cart_item_exists = False
+        for item in cart:
+            if item.get('item_type') == 'loyalty_roll' and item.get('item_id') == roll_id:
+                # Увеличиваем количество
+                item['quantity'] += 1
+                cart_item_exists = True
+                break
+        
+        if not cart_item_exists:
+            # Добавляем новый товар в корзину
+            cart_item = {
+                'item_type': 'loyalty_roll',
+                'item_id': roll_id,
+                'quantity': 1,
+                'price': 0.0,  # Бесплатно благодаря накопительной карте
+                'name': roll.name,
+                'is_loyalty': True  # Флаг что это бесплатный ролл
+            }
+            cart.append(cart_item)
+        
+        # Обновляем корзину пользователя
+        user.cart = json.dumps(cart)
+        
+        # Создаем запись об использовании карты
+        usage = LoyaltyCardUsage(
+            user_id=user_id,
+            loyalty_card_id=card_id,
+            roll_id=roll_id
+        )
+        db.session.add(usage)
+        
+        # Удаляем использованную карту
+        db.session.delete(card)
+        
+        db.session.commit()
+        
+        print(f"✅ Накопительная карта использована: карта {card.card_number}, ролл {roll.name} добавлен в корзину")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Ролл "{roll.name}" добавлен в корзину бесплатно!',
+            'used_card': card.to_dict(),
+            'selected_roll': loyalty_roll.to_dict(),
+            'added_to_cart': True
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Ошибка при использовании накопительной карты: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/loyalty/history', methods=['GET'])
+@jwt_required()
+def get_loyalty_history():
+    """Получение истории использования накопительных карт"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        # Получаем историю использования
+        history = LoyaltyCardUsage.query.filter_by(user_id=user_id).order_by(LoyaltyCardUsage.used_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'history': [h.to_dict() for h in history],
+            'total': len(history)
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении истории: {e}")
         return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
 @app.route('/api/orders', methods=['GET'])
@@ -664,17 +977,56 @@ def get_cart():
                 set_item = Set.query.get(cart_item['item_id'])
                 if set_item:
                     item_data = set_item.to_dict()
+            elif cart_item['item_type'] == 'loyalty_roll':
+                # Обработка бесплатных роллов из накопительных карт
+                roll = Roll.query.get(cart_item['item_id'])
+                if roll:
+                    item_data = roll.to_dict()
+                    # Переопределяем цену на 0 для бесплатных роллов
+                    item_data['sale_price'] = 0.0
+            elif cart_item['item_type'] == 'bonus_points':
+                # Обработка бонусных баллов
+                item_data = {
+                    'id': 'bonus',
+                    'name': cart_item.get('name', 'Бонусные баллы'),
+                    'description': 'Скидка за бонусные баллы',
+                    'sale_price': cart_item.get('price', 0),
+                    'image_url': None
+                }
             
             if item_data:
                 cart_item_with_data = cart_item.copy()
                 cart_item_with_data['item'] = item_data
-                cart_item_with_data['price'] = item_data.get('sale_price', item_data.get('set_price', 0))
+                
+                # Определяем цену в зависимости от типа товара
+                if cart_item['item_type'] == 'loyalty_roll':
+                    cart_item_with_data['price'] = 0.0  # Бесплатно
+                    cart_item_with_data['is_loyalty'] = True
+                    cart_item_with_data['is_bonus'] = False
+                elif cart_item['item_type'] == 'bonus_points':
+                    cart_item_with_data['price'] = item_data.get('sale_price', 0)  # Отрицательная цена = скидка
+                    cart_item_with_data['is_loyalty'] = False
+                    cart_item_with_data['is_bonus'] = True
+                else:
+                    cart_item_with_data['price'] = item_data.get('sale_price', item_data.get('set_price', 0))
+                    cart_item_with_data['is_loyalty'] = False
+                    cart_item_with_data['is_bonus'] = False
+                
                 cart_with_items.append(cart_item_with_data)
+        
+        # Вычисляем общую стоимость корзины
+        total_price = 0
+        for item in cart_with_items:
+            if item.get('price'):
+                total_price += item['price'] * item['quantity']
         
         return jsonify({
             'success': True,
             'cart': cart_with_items,
-            'total': len(cart_with_items)
+            'total': len(cart_with_items),
+            'total_price': total_price,
+            'bonus_points': user.bonus_points,
+            'can_use_bonus': user.bonus_points > 0 and total_price > 0
         }), 200
     except Exception as e:
         print(f"❌ Ошибка при получении корзины: {e}")
@@ -696,6 +1048,26 @@ def add_to_cart():
         if not data.get('item_type') or not data.get('item_id') or not data.get('quantity'):
             return jsonify({'error': 'Тип, ID и количество элемента обязательны'}), 400
         
+        # Валидация количества
+        quantity = data.get('quantity')
+        if quantity <= 0:
+            return jsonify({'error': 'Количество должно быть больше 0'}), 400
+        
+        # Проверяем существование товара
+        item_type = data['item_type']
+        item_id = data['item_id']
+        
+        if item_type == 'roll':
+            roll = Roll.query.get(item_id)
+            if not roll:
+                return jsonify({'error': 'Ролл не найден'}), 404
+        elif item_type == 'set':
+            set_item = Set.query.get(item_id)
+            if not set_item:
+                return jsonify({'error': 'Сет не найден'}), 404
+        else:
+            return jsonify({'error': 'Неизвестный тип товара'}), 400
+        
         # Используем JSON поле cart в пользователе
         cart = json.loads(user.cart) if user.cart else []
         
@@ -708,21 +1080,21 @@ def add_to_cart():
         
         if existing_item:
             # Увеличиваем количество
-            existing_item['quantity'] += data['quantity']
+            existing_item['quantity'] += quantity
         else:
             # Добавляем новый товар
             cart.append({
                 'id': len(cart) + 1,
                 'item_type': data['item_type'],
                 'item_id': data['item_id'],
-                'quantity': data['quantity'],
+                'quantity': quantity,
                 'added_at': datetime.now().isoformat()
             })
         
         user.cart = json.dumps(cart)
         db.session.commit()
         
-        print(f"✅ Товар добавлен в корзину: {data['item_type']} ID {data['item_id']}, количество {data['quantity']}")
+        print(f"✅ Товар добавлен в корзину: {data['item_type']} ID {data['item_id']}, количество {quantity}")
         
         return jsonify({
             'success': True,
@@ -733,13 +1105,52 @@ def add_to_cart():
         print(f"❌ Ошибка при добавлении в корзину: {e}")
         return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
+@app.route('/api/cart/remove', methods=['DELETE'])
 @app.route('/api/cart/remove/<int:item_id>', methods=['DELETE'])
 @jwt_required()
-def remove_from_cart(item_id):
+def remove_from_cart(item_id=None):
     """Удаление товара из корзины"""
     try:
         user_id = get_jwt_identity()
-        # Здесь нужно будет создать таблицу cart
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        # Для DELETE запросов с item_id в URL, не требуем JSON
+        if item_id is None:
+            data = request.get_json() or {}
+            item_id = data.get('item_id')
+            if not item_id:
+                return jsonify({'error': 'ID товара не указан'}), 400
+            item_type = data.get('item_type')
+            if not item_type:
+                return jsonify({'error': 'Тип товара не указан'}), 400
+        else:
+            # Если item_id передан в URL, определяем тип по корзине
+            cart = json.loads(user.cart) if user.cart else []
+            item_type = None
+            for item in cart:
+                if item.get('id') == item_id:
+                    item_type = item.get('item_type')
+                    break
+            
+            if not item_type:
+                return jsonify({'error': 'Товар не найден в корзине'}), 404
+        
+        # Получаем корзину из JSON поля
+        cart = json.loads(user.cart) if user.cart else []
+        
+        # Удаляем товар с указанным ID и типом
+        original_length = len(cart)
+        cart = [item for item in cart if not (item.get('id') == item_id and item.get('item_type') == item_type)]
+        
+        if len(cart) == original_length:
+            return jsonify({'error': 'Товар не найден в корзине'}), 404
+        
+        user.cart = json.dumps(cart)
+        db.session.commit()
+        
         print(f"✅ Товар удален из корзины: ID {item_id}")
         
         return jsonify({
@@ -750,19 +1161,58 @@ def remove_from_cart(item_id):
         print(f"❌ Ошибка при удалении из корзины: {e}")
         return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
+@app.route('/api/cart/update', methods=['PUT'])
 @app.route('/api/cart/update/<int:item_id>', methods=['PUT'])
 @jwt_required()
-def update_cart_item(item_id):
+def update_cart_item(item_id=None):
     """Обновление количества товара в корзине"""
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
         data = request.get_json()
+        
+        # Получаем данные из JSON
+        if not data:
+            return jsonify({'error': 'Данные не переданы'}), 400
+        
+        # Если item_id не передан в URL, берем из JSON
+        if item_id is None:
+            item_id = data.get('item_id')
+            if not item_id:
+                return jsonify({'error': 'ID товара не указан'}), 400
+        
+        item_type = data.get('item_type')
+        if not item_type:
+            return jsonify({'error': 'Тип товара не указан'}), 400
         
         if not data.get('quantity'):
             return jsonify({'error': 'Количество обязательно'}), 400
         
-        # Здесь нужно будет создать таблицу cart
-        print(f"✅ Количество товара обновлено: ID {item_id}, новое количество {data['quantity']}")
+        new_quantity = int(data['quantity'])
+        cart = json.loads(user.cart) if user.cart else []
+        
+        if new_quantity <= 0:
+            # Если количество 0 или меньше, удаляем товар
+            cart = [item for item in cart if not (item.get('item_id') == item_id and item.get('item_type') == item_type)]
+        else:
+            # Обновляем количество
+            for item in cart:
+                if item.get('item_id') == item_id and item.get('item_type') == item_type:
+                    item['quantity'] = new_quantity
+                    break
+            else:
+                # Если товар не найден, возвращаем ошибку
+                return jsonify({'error': 'Товар не найден в корзине'}), 404
+        
+        user.cart = json.dumps(cart)
+        
+        db.session.commit()
+        
+        print(f"✅ Количество товара обновлено: ID {item_id}, новое количество {new_quantity}")
         
         return jsonify({
             'success': True,
@@ -778,7 +1228,15 @@ def clear_cart():
     """Очистка корзины"""
     try:
         user_id = get_jwt_identity()
-        # Здесь нужно будет создать таблицу cart
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        # Очищаем корзину
+        user.cart = '[]'
+        db.session.commit()
+        
         print(f"✅ Корзина очищена для пользователя {user_id}")
         
         return jsonify({
@@ -823,7 +1281,8 @@ def admin_rolls():
             # Получить список роллов
             rolls = Roll.query.all()
             return jsonify({
-                'rolls': [roll.to_dict() for roll in rolls]
+                'rolls': [roll.to_dict() for roll in rolls],
+                'total': len(rolls)
             })
         elif request.method == 'POST':
             # Создать новый ролл
@@ -911,6 +1370,36 @@ def admin_delete_roll(roll_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rolls/<int:roll_id>/recipe', methods=['GET'])
+def get_roll_recipe(roll_id):
+    """Получить рецептуру ролла"""
+    try:
+        roll = Roll.query.get(roll_id)
+        if not roll:
+            return jsonify({'error': 'Ролл не найден'}), 404
+        
+        # Получаем ингредиенты ролла
+        roll_ingredients = RollIngredient.query.filter_by(roll_id=roll_id).all()
+        
+        ingredients = []
+        for roll_ingredient in roll_ingredients:
+            ingredient = Ingredient.query.get(roll_ingredient.ingredient_id)
+            if ingredient:
+                ingredients.append({
+                    'ingredient': ingredient.to_dict(),
+                    'quantity': roll_ingredient.amount_per_roll,
+                    'unit': 'гр'  # По умолчанию граммы
+                })
+        
+        return jsonify({
+            'roll': roll.to_dict(),
+            'ingredients': ingredients
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении рецепта ролла: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
 @app.route('/api/admin/rolls/<int:roll_id>/recipe', methods=['GET'])
 @jwt_required()
@@ -1044,7 +1533,8 @@ def admin_sets():
             # Получить список сетов
             sets = Set.query.all()
             return jsonify({
-                'sets': [set_item.to_dict() for set_item in sets]
+                'sets': [set_item.to_dict() for set_item in sets],
+                'total': len(sets)
             })
         elif request.method == 'POST':
             # Создать новый сет
@@ -1148,7 +1638,8 @@ def admin_get_ingredients():
         
         ingredients = Ingredient.query.all()
         return jsonify({
-            'ingredients': [ing.to_dict() for ing in ingredients]
+            'ingredients': [ing.to_dict() for ing in ingredients],
+            'total': len(ingredients)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1261,7 +1752,8 @@ def admin_other_items():
             # Получить список других товаров
             items = OtherItem.query.all()
             return jsonify({
-                'items': [item.to_dict() for item in items]
+                'items': [item.to_dict() for item in items],
+                'total': len(items)
             })
         elif request.method == 'POST':
             # Создать новый товар
@@ -1506,6 +1998,93 @@ def admin_update_set_composition(set_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# Функция для инициализации накопительной системы
+def initialize_loyalty_system():
+    """Инициализация системы накопительных карт"""
+    try:
+        # Проверяем, есть ли уже накопительные роллы
+        if LoyaltyRoll.query.count() == 0:
+            # Получаем 5 самых дешевых роллов
+            cheapest_rolls = Roll.query.order_by(Roll.sale_price.asc()).limit(5).all()
+            
+            for roll in cheapest_rolls:
+                loyalty_roll = LoyaltyRoll(
+                    roll_id=roll.id,
+                    is_available=True
+                )
+                db.session.add(loyalty_roll)
+            
+            db.session.commit()
+            print("✅ Система накопительных карт инициализирована!")
+            print(f"📋 Добавлено {len(cheapest_rolls)} роллов для накопительной системы")
+        else:
+            print("✅ Система накопительных карт уже инициализирована")
+            
+    except Exception as e:
+        print(f"❌ Ошибка инициализации накопительной системы: {e}")
+
+# Функция для обработки накопительных карт при заказе
+def process_loyalty_card(user_id, order_amount):
+    """Обработка накопительных карт при создании заказа"""
+    try:
+        # Вычисляем количество роллов для накопления (каждые 1000 сом = 1 ролл)
+        rolls_to_add = int(order_amount // 1000)
+        
+        if rolls_to_add == 0:
+            return  # Ничего не накапливаем
+        
+        # Получаем текущую активную карту пользователя (не заполненную)
+        active_card = LoyaltyCard.query.filter_by(
+            user_id=user_id, 
+            is_completed=False
+        ).order_by(LoyaltyCard.created_at.desc()).first()
+        
+        # Если нет активной карты, создаем новую
+        if not active_card:
+            # Генерируем номер карты
+            card_count = LoyaltyCard.query.filter_by(user_id=user_id).count() + 1
+            card_number = f"LC-{user_id:03d}-{card_count:03d}"
+            
+            active_card = LoyaltyCard(
+                user_id=user_id,
+                card_number=card_number,
+                filled_rolls=0,
+                is_completed=False
+            )
+            db.session.add(active_card)
+            db.session.flush()  # Получаем ID
+        
+        # Добавляем роллы к карте
+        current_filled = active_card.filled_rolls
+        new_filled = min(current_filled + rolls_to_add, 8)
+        active_card.filled_rolls = new_filled
+        
+        # Если карта заполнена, отмечаем как завершенную
+        if new_filled == 8:
+            active_card.is_completed = True
+            active_card.completed_at = datetime.utcnow()
+            
+            # Если остались лишние роллы, создаем новую карту
+            extra_rolls = (current_filled + rolls_to_add) - 8
+            if extra_rolls > 0:
+                card_count = LoyaltyCard.query.filter_by(user_id=user_id).count() + 1
+                new_card_number = f"LC-{user_id:03d}-{card_count:03d}"
+                
+                new_card = LoyaltyCard(
+                    user_id=user_id,
+                    card_number=new_card_number,
+                    filled_rolls=extra_rolls,
+                    is_completed=False
+                )
+                db.session.add(new_card)
+        
+        db.session.commit()
+        print(f"✅ Накопительная карта обновлена: +{rolls_to_add} роллов")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Ошибка обработки накопительной карты: {e}")
+
 # Создание таблиц при запуске
 with app.app_context():
     db.create_all()
@@ -1520,6 +2099,228 @@ with app.app_context():
     print("   - set_rolls")
     print("   - orders")
     print("   - order_items")
+    print("   - loyalty_cards")
+    print("   - loyalty_rolls")
+    print("   - loyalty_card_usage")
+    
+    # Инициализируем накопительную систему
+    initialize_loyalty_system()
+
+# ===== РЕФЕРАЛЬНАЯ СИСТЕМА =====
+
+@app.route('/api/referral/my-code', methods=['GET'])
+@jwt_required()
+def get_my_referral_code():
+    """Получить свой реферальный код"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        return jsonify({
+            'referral_code': user.referral_code,
+            'bonus_points': user.bonus_points,
+            'referrals_count': len(user.referrals_made)
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении реферального кода: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/referral/check-code', methods=['POST'])
+def check_referral_code():
+    """Проверить реферальный код"""
+    try:
+        data = request.get_json()
+        referral_code = data.get('referral_code', '').strip().upper()
+        
+        if not referral_code:
+            return jsonify({'error': 'Реферальный код не указан'}), 400
+        
+        # Проверяем существование кода
+        referrer_user = User.query.filter_by(referral_code=referral_code).first()
+        
+        if not referrer_user:
+            return jsonify({'error': 'Реферальный код не найден'}), 404
+        
+        return jsonify({
+            'valid': True,
+            'referrer_name': referrer_user.name,
+            'message': f'Код принадлежит пользователю {referrer_user.name}'
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при проверке реферального кода: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/referral/my-referrals', methods=['GET'])
+@jwt_required()
+def get_my_referrals():
+    """Получить список моих рефералов"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        # Получаем всех рефералов
+        referrals = ReferralUsage.query.filter_by(referrer_id=user_id).all()
+        
+        referrals_data = []
+        for referral in referrals:
+            referrals_data.append({
+                'id': referral.id,
+                'referred_user_name': referral.referred.name,
+                'referred_user_email': referral.referred.email,
+                'bonus_points_awarded': referral.bonus_points_awarded,
+                'created_at': referral.created_at.isoformat() if referral.created_at else None
+            })
+        
+        return jsonify({
+            'referrals': referrals_data,
+            'total': len(referrals_data),
+            'total_bonus_points': sum(r.bonus_points_awarded for r in referrals)
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении рефералов: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/referral/history', methods=['GET'])
+@jwt_required()
+def get_referral_history():
+    """Получить историю реферальных операций"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        # Получаем историю рефералов (кого пригласил)
+        referrals_made = ReferralUsage.query.filter_by(referrer_id=user_id).all()
+        
+        # Получаем информацию о том, кто пригласил текущего пользователя
+        referred_by_info = None
+        if user.referred_by:
+            referrer = User.query.filter_by(referral_code=user.referred_by).first()
+            if referrer:
+                referred_by_info = {
+                    'referrer_name': referrer.name,
+                    'referral_code': user.referred_by,
+                    'bonus_points_received': user.bonus_points
+                }
+        
+        referrals_made_data = []
+        for referral in referrals_made:
+            referrals_made_data.append({
+                'id': referral.id,
+                'referred_user_name': referral.referred.name,
+                'bonus_points_awarded': referral.bonus_points_awarded,
+                'created_at': referral.created_at.isoformat() if referral.created_at else None
+            })
+        
+        return jsonify({
+            'referred_by': referred_by_info,
+            'referrals_made': referrals_made_data,
+            'total_referrals_made': len(referrals_made_data),
+            'total_bonus_points_earned': sum(r.bonus_points_awarded for r in referrals_made)
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Ошибка при получении истории рефералов: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/cart/use-bonus', methods=['POST'])
+@jwt_required()
+def use_bonus_points():
+    """Использовать бонусные баллы в корзине"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        data = request.get_json()
+        bonus_to_use = data.get('bonus_points', 0)
+        
+        if bonus_to_use <= 0:
+            return jsonify({'error': 'Количество бонусных баллов должно быть больше 0'}), 400
+        
+        if bonus_to_use > user.bonus_points:
+            return jsonify({'error': 'Недостаточно бонусных баллов'}), 400
+        
+        # Получаем корзину
+        cart = json.loads(user.cart) if user.cart else []
+        
+        if not cart:
+            return jsonify({'error': 'Корзина пуста'}), 400
+        
+        # Вычисляем общую стоимость корзины
+        total_price = 0
+        for cart_item in cart:
+            item_type = cart_item['item_type']
+            item_id = cart_item['item_id']
+            quantity = cart_item['quantity']
+            
+            unit_price = 0
+            if item_type == 'roll':
+                roll = Roll.query.get(item_id)
+                if roll:
+                    unit_price = roll.sale_price
+            elif item_type == 'set':
+                set_item = Set.query.get(item_id)
+                if set_item:
+                    unit_price = set_item.set_price
+            elif item_type == 'loyalty_roll':
+                unit_price = 0.0  # Бесплатные роллы не влияют на стоимость
+            
+            total_price += unit_price * quantity
+        
+        if total_price <= 0:
+            return jsonify({'error': 'В корзине нет товаров для оплаты'}), 400
+        
+        # Определяем максимальное количество бонусных баллов для использования
+        max_bonus_to_use = min(bonus_to_use, user.bonus_points, total_price)
+        
+        # Создаем специальный элемент в корзине для бонусных баллов
+        bonus_item = {
+            'item_type': 'bonus_points',
+            'item_id': 'bonus',
+            'quantity': 1,
+            'price': -max_bonus_to_use,  # Отрицательная цена = скидка
+            'name': f'Бонусные баллы ({max_bonus_to_use}₽)',
+            'is_bonus': True,
+            'added_at': datetime.now().isoformat()
+        }
+        
+        # Добавляем бонусный элемент в корзину
+        cart.append(bonus_item)
+        user.cart = json.dumps(cart)
+        
+        # Списываем бонусные баллы
+        user.bonus_points -= max_bonus_to_use
+        
+        db.session.commit()
+        
+        print(f"✅ Использовано {max_bonus_to_use} бонусных баллов пользователем {user.name}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Использовано {max_bonus_to_use} бонусных баллов',
+            'bonus_points_used': max_bonus_to_use,
+            'remaining_bonus_points': user.bonus_points,
+            'discount_applied': max_bonus_to_use
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Ошибка при использовании бонусных баллов: {e}")
+        return jsonify({'error': f'Ошибка: {str(e)}'}), 500
 
 if __name__ == '__main__':
     print("🚀 Запуск Sushi Express API с SQLite базой данных...")

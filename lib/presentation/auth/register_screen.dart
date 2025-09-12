@@ -15,10 +15,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _referralCodeController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _agreeToTerms = false;
   bool _isLoading = false;
+  bool _isCheckingReferralCode = false;
+  String? _referralCodeStatus;
   
   final AuthService _authService = AuthService();
 
@@ -29,6 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -55,6 +59,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
         password: _passwordController.text,
+        referralCode: _referralCodeController.text.trim().isNotEmpty 
+            ? _referralCodeController.text.trim() 
+            : null,
       );
 
       if (!mounted) return;
@@ -107,6 +114,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _onLoginPressed() {
     Navigator.pushReplacementNamed(context, '/login-screen');
+  }
+
+  void _checkReferralCode() async {
+    final referralCode = _referralCodeController.text.trim();
+    if (referralCode.isEmpty) {
+      setState(() {
+        _referralCodeStatus = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingReferralCode = true;
+      _referralCodeStatus = null;
+    });
+
+    try {
+      final result = await _authService.checkReferralCode(referralCode);
+      
+      if (mounted) {
+        setState(() {
+          _isCheckingReferralCode = false;
+          if (result['success'] && result['valid']) {
+            _referralCodeStatus = 'valid';
+          } else {
+            _referralCodeStatus = 'invalid';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingReferralCode = false;
+          _referralCodeStatus = 'error';
+        });
+      }
+    }
   }
 
   @override
@@ -316,6 +360,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                         return null;
                       },
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Referral Code Field
+                    TextFormField(
+                      controller: _referralCodeController,
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
+                      onChanged: (value) {
+                        // Проверяем код при изменении (с задержкой)
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          if (_referralCodeController.text == value) {
+                            _checkReferralCode();
+                          }
+                        });
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Промокод (необязательно)',
+                        hintText: 'Введите промокод друга',
+                        prefixIcon: const Icon(Icons.card_giftcard_outlined),
+                        suffixIcon: _isCheckingReferralCode
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Padding(
+                                  padding: EdgeInsets.all(12.0),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              )
+                            : _referralCodeStatus == 'valid'
+                                ? const Icon(Icons.check_circle, color: Colors.green)
+                                : _referralCodeStatus == 'invalid'
+                                    ? const Icon(Icons.error, color: Colors.red)
+                                    : null,
+                        border: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                        ),
+                        helperText: _referralCodeStatus == 'valid'
+                            ? '✅ Промокод действителен! Вы получите 200 бонусных баллов'
+                            : _referralCodeStatus == 'invalid'
+                                ? '❌ Промокод не найден'
+                                : _referralCodeStatus == 'error'
+                                    ? '❌ Ошибка проверки промокода'
+                                    : 'Получите 200 бонусных баллов за регистрацию по промокоду',
+                        helperStyle: TextStyle(
+                          color: _referralCodeStatus == 'valid'
+                              ? Colors.green
+                              : _referralCodeStatus == 'invalid' || _referralCodeStatus == 'error'
+                                  ? Colors.red
+                                  : Colors.grey[600],
+                        ),
+                      ),
                     ),
                     
                     const SizedBox(height: 24),

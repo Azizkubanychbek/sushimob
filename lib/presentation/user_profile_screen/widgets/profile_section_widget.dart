@@ -144,6 +144,50 @@ class _ProfileSectionWidgetState extends State<ProfileSectionWidget> {
                   const SizedBox(height: 8),
                 ],
                 
+                // Кнопка накопительных карт
+                if (isLoggedIn) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/loyalty-screen');
+                      },
+                      icon: const Icon(Icons.credit_card),
+                      label: const Text('Накопительные карты'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.deepOrange,
+                        side: BorderSide(color: Colors.deepOrange),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Кнопка реферальной системы
+                if (isLoggedIn) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/referral-screen');
+                      },
+                      icon: const Icon(Icons.card_giftcard),
+                      label: const Text('Реферальная система'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.purple,
+                        side: BorderSide(color: Colors.purple),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

@@ -13,6 +13,9 @@ import '../presentation/auth/login_screen.dart';
 import '../presentation/auth/register_screen.dart';
 import '../presentation/debug/debug_page.dart';
 import '../presentation/admin_screen/admin_screen.dart';
+import '../presentation/checkout_screen/checkout_screen.dart';
+import '../presentation/loyalty_screen/loyalty_screen.dart';
+import '../presentation/referral_screen/referral_screen.dart';
 
 class AppRoutes {
   // TODO: Add your routes here
@@ -31,6 +34,9 @@ class AppRoutes {
   static const String registerScreen = '/register-screen';
   static const String debugPage = '/debug-page';
   static const String adminScreen = '/admin-screen';
+  static const String checkoutScreen = '/checkout-screen';
+  static const String loyaltyScreen = '/loyalty-screen';
+  static const String referralScreen = '/referral-screen';
 
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const HomeScreen(),
@@ -48,6 +54,9 @@ class AppRoutes {
     registerScreen: (context) => const RegisterScreen(),
     debugPage: (context) => const DebugPage(),
     adminScreen: (context) => const AdminScreen(),
+    checkoutScreen: (context) => const CheckoutScreen(),
+    loyaltyScreen: (context) => const LoyaltyScreen(),
+    referralScreen: (context) => const ReferralScreen(),
     // TODO: Add your other routes here
   };
 }

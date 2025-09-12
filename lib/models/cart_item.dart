@@ -20,14 +20,36 @@ class CartItem {
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
     dynamic item;
-    if (json['item_type'] == 'roll') {
-      item = Roll.fromJson(json['item']);
-    } else if (json['item_type'] == 'set') {
-      item = Set.fromJson(json['item']);
+    
+    // Проверяем, что item существует и не null
+    if (json['item'] != null) {
+      if (json['item_type'] == 'roll') {
+        item = Roll.fromJson(json['item']);
+      } else if (json['item_type'] == 'set') {
+        item = Set.fromJson(json['item']);
+      } else if (json['item_type'] == 'loyalty_roll') {
+        // Для бесплатных роллов тоже используем Roll
+        item = Roll.fromJson(json['item']);
+      } else if (json['item_type'] == 'bonus_points') {
+        // Для бонусных баллов создаем фиктивный объект
+        item = {
+          'id': 'bonus',
+          'name': json['name'] ?? 'Бонусные баллы',
+          'description': 'Скидка за бонусные баллы',
+          'sale_price': json['price'] ?? 0.0,
+          'image_url': null,
+        };
+      }
+    }
+
+    // Для бонусных баллов генерируем уникальный ID
+    int itemId = json['id']?.toInt() ?? 0;
+    if (json['item_type'] == 'bonus_points' && itemId == 0) {
+      itemId = -1; // Используем отрицательный ID для бонусных баллов
     }
 
     return CartItem(
-      id: json['id']?.toInt() ?? 0,
+      id: itemId,
       itemType: json['item_type'] ?? '',
       item: item,
       quantity: json['quantity']?.toInt() ?? 0,
@@ -37,10 +59,20 @@ class CartItem {
   }
 
   Map<String, dynamic> toJson() {
+    dynamic itemJson;
+    if (item is Roll || item is Set) {
+      itemJson = item.toJson();
+    } else if (item is Map<String, dynamic>) {
+      // Для бонусных баллов
+      itemJson = item;
+    } else {
+      itemJson = {};
+    }
+
     return {
       'id': id,
       'item_type': itemType,
-      'item': item.toJson(),
+      'item': itemJson,
       'quantity': quantity,
       'added_at': addedAt,
       'price': price, // Include price in JSON
@@ -52,6 +84,9 @@ class CartItem {
       return (item as Roll).name;
     } else if (item is Set) {
       return (item as Set).name;
+    } else if (item is Map<String, dynamic>) {
+      // Для бонусных баллов
+      return item['name'] ?? 'Бонусные баллы';
     }
     return '';
   }

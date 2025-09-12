@@ -1,0 +1,124 @@
+🗄️ ВИЗУАЛЬНАЯ ДИАГРАММА БАЗЫ ДАННЫХ SUSHI EXPRESS
+============================================================
+
+                    ┌─────────────┐
+                    │    USERS    │ (2 записи)
+                    │             │
+                    │ • id (PK)   │
+                    │ • name      │
+                    │ • email     │
+                    │ • phone     │
+                    │ • favorites │ (JSON)
+                    │ • cart      │ (JSON)
+                    │ • is_admin  │
+                    └─────┬───────┘
+                          │
+                          │ 1:N
+                          ▼
+                    ┌─────────────┐
+                    │   ORDERS    │ (0 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • user_id   │ (FK)
+                    │ • phone     │
+                    │ • address   │
+                    │ • status    │
+                    │ • total     │
+                    └─────┬───────┘
+                          │
+                          │ 1:N
+                          ▼
+                    ┌─────────────┐
+                    │ORDER_ITEMS  │ (0 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • order_id  │ (FK)
+                    │ • item_type │
+                    │ • item_id   │
+                    │ • quantity  │
+                    └─────────────┘
+
+                    ┌─────────────┐
+                    │INGREDIENTS  │ (53 записи)
+                    │             │
+                    │ • id (PK)   │
+                    │ • name      │
+                    │ • cost_unit │
+                    │ • unit      │
+                    └─────┬───────┘
+                          │
+                          │ 1:N
+                          ▼
+                    ┌─────────────┐
+                    │ROLL_INGRED. │ (120 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • roll_id   │ (FK)
+                    │ • ingr_id   │ (FK)
+                    │ • amount    │
+                    └─────┬───────┘
+                          │
+                          │ N:1
+                          ▼
+                    ┌─────────────┐
+                    │    ROLLS    │ (25 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • name      │
+                    │ • cost_price│
+                    │ • sale_price│
+                    │ • image_url │
+                    │ • is_popular│
+                    └─────┬───────┘
+                          │
+                          │ 1:N
+                          ▼
+                    ┌─────────────┐
+                    │  SET_ROLLS  │ (58 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • set_id    │ (FK)
+                    │ • roll_id   │ (FK)
+                    │ • quantity  │
+                    └─────┬───────┘
+                          │
+                          │ N:1
+                          ▼
+                    ┌─────────────┐
+                    │    SETS     │ (14 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • name      │
+                    │ • cost_price│
+                    │ • set_price │
+                    │ • discount  │
+                    │ • image_url │
+                    └─────────────┘
+
+                    ┌─────────────┐
+                    │OTHER_ITEMS  │ (9 записей)
+                    │             │
+                    │ • id (PK)   │
+                    │ • name      │
+                    │ • cost_price│
+                    │ • sale_price│
+                    │ • category  │
+                    │ • image_url │
+                    └─────────────┘
+
+🔗 СВЯЗИ:
+- USERS → ORDERS (1:N)
+- ORDERS → ORDER_ITEMS (1:N)
+- INGREDIENTS → ROLL_INGREDIENTS (1:N)
+- ROLLS → ROLL_INGREDIENTS (1:N)
+- ROLLS → SET_ROLLS (1:N)
+- SETS → SET_ROLLS (1:N)
+
+📊 СТАТИСТИКА:
+- Всего таблиц: 10
+- Всего записей: 267
+- Активных пользователей: 2
+- Роллов: 25
+- Сетов: 14
+- Ингредиентов: 53
+- Дополнительных товаров: 9

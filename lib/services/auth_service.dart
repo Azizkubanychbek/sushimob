@@ -53,6 +53,7 @@ class AuthService {
     required String email,
     required String phone,
     required String password,
+    String? referralCode,
   }) async {
     try {
       print('📝 Попытка регистрации через API: $email');
@@ -68,6 +69,7 @@ class AuthService {
         email: email,
         phone: phone,
         password: password,
+        referralCode: referralCode,
       );
 
       print('📡 Результат API регистрации: $result');
@@ -313,6 +315,61 @@ class AuthService {
         success: false,
         message: 'Произошла ошибка при изменении пароля',
       );
+    }
+  }
+
+  // ===== РЕФЕРАЛЬНАЯ СИСТЕМА =====
+
+  // Получить свой реферальный код
+  Future<Map<String, dynamic>> getMyReferralCode() async {
+    try {
+      if (_currentSessionToken == null) {
+        return {
+          'success': false,
+          'error': 'Необходимо войти в систему',
+        };
+      }
+
+      return await _userService.getMyReferralCode(_currentSessionToken!);
+    } catch (e) {
+      print('❌ Ошибка получения реферального кода: $e');
+      return {
+        'success': false,
+        'error': 'Произошла ошибка при получении реферального кода',
+      };
+    }
+  }
+
+  // Проверить реферальный код
+  Future<Map<String, dynamic>> checkReferralCode(String referralCode) async {
+    try {
+      return await _userService.checkReferralCode(referralCode);
+    } catch (e) {
+      print('❌ Ошибка проверки реферального кода: $e');
+      return {
+        'success': false,
+        'error': 'Произошла ошибка при проверке реферального кода',
+      };
+    }
+  }
+
+  // Получить историю рефералов
+  Future<Map<String, dynamic>> getReferralHistory() async {
+    try {
+      if (_currentSessionToken == null) {
+        return {
+          'success': false,
+          'error': 'Необходимо войти в систему',
+        };
+      }
+
+      return await _userService.getReferralHistory(_currentSessionToken!);
+    } catch (e) {
+      print('❌ Ошибка получения истории рефералов: $e');
+      return {
+        'success': false,
+        'error': 'Произошла ошибка при получении истории рефералов',
+      };
     }
   }
 }

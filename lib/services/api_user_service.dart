@@ -45,19 +45,26 @@ class ApiUserService {
     required String email,
     required String phone,
     required String password,
+    String? referralCode,
   }) async {
     try {
       print('🌐 API: Регистрация пользователя $email...');
       
+      final requestBody = {
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'password': password,
+      };
+      
+      if (referralCode != null && referralCode.isNotEmpty) {
+        requestBody['referral_code'] = referralCode;
+      }
+      
       final response = await http.post(
         Uri.parse('$_baseUrl/register'),
         headers: _headers,
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'phone': phone,
-          'password': password,
-        }),
+        body: jsonEncode(requestBody),
       );
 
       final jsonData = jsonDecode(response.body);
@@ -305,6 +312,129 @@ class ApiUserService {
       }
     } catch (e) {
       print('❌ API: Ошибка сети при изменении пароля: $e');
+      return {
+        'success': false,
+        'error': 'Ошибка сети: $e',
+      };
+    }
+  }
+
+  // ===== РЕФЕРАЛЬНАЯ СИСТЕМА =====
+
+  // Получить свой реферальный код
+  Future<Map<String, dynamic>> getMyReferralCode(String accessToken) async {
+    try {
+      print('🌐 API: Получение реферального кода...');
+      
+      final response = await http.get(
+        Uri.parse('$_baseUrl/referral/my-code'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      final jsonData = jsonDecode(response.body);
+      print('📡 API ответ: ${response.statusCode} - ${response.body}');
+      
+      if (response.statusCode == 200) {
+        print('✅ API: Реферальный код получен');
+        return {
+          'success': true,
+          'referral_code': jsonData['referral_code'],
+          'bonus_points': jsonData['bonus_points'],
+          'referrals_count': jsonData['referrals_count'],
+        };
+      } else {
+        print('❌ API: Ошибка получения реферального кода: ${jsonData['error']}');
+        return {
+          'success': false,
+          'error': jsonData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ API: Ошибка сети при получении реферального кода: $e');
+      return {
+        'success': false,
+        'error': 'Ошибка сети: $e',
+      };
+    }
+  }
+
+  // Проверить реферальный код
+  Future<Map<String, dynamic>> checkReferralCode(String referralCode) async {
+    try {
+      print('🌐 API: Проверка реферального кода: $referralCode');
+      
+      final response = await http.post(
+        Uri.parse('$_baseUrl/referral/check-code'),
+        headers: _headers,
+        body: jsonEncode({
+          'referral_code': referralCode,
+        }),
+      );
+
+      final jsonData = jsonDecode(response.body);
+      print('📡 API ответ: ${response.statusCode} - ${response.body}');
+      
+      if (response.statusCode == 200) {
+        print('✅ API: Реферальный код валиден');
+        return {
+          'success': true,
+          'valid': jsonData['valid'],
+          'referrer_name': jsonData['referrer_name'],
+          'message': jsonData['message'],
+        };
+      } else {
+        print('❌ API: Реферальный код невалиден: ${jsonData['error']}');
+        return {
+          'success': false,
+          'error': jsonData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ API: Ошибка сети при проверке реферального кода: $e');
+      return {
+        'success': false,
+        'error': 'Ошибка сети: $e',
+      };
+    }
+  }
+
+  // Получить историю рефералов
+  Future<Map<String, dynamic>> getReferralHistory(String accessToken) async {
+    try {
+      print('🌐 API: Получение истории рефералов...');
+      
+      final response = await http.get(
+        Uri.parse('$_baseUrl/referral/history'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      final jsonData = jsonDecode(response.body);
+      print('📡 API ответ: ${response.statusCode} - ${response.body}');
+      
+      if (response.statusCode == 200) {
+        print('✅ API: История рефералов получена');
+        return {
+          'success': true,
+          'referred_by': jsonData['referred_by'],
+          'referrals_made': jsonData['referrals_made'],
+          'total_referrals_made': jsonData['total_referrals_made'],
+          'total_bonus_points_earned': jsonData['total_bonus_points_earned'],
+        };
+      } else {
+        print('❌ API: Ошибка получения истории рефералов: ${jsonData['error']}');
+        return {
+          'success': false,
+          'error': jsonData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ API: Ошибка сети при получении истории рефералов: $e');
       return {
         'success': false,
         'error': 'Ошибка сети: $e',

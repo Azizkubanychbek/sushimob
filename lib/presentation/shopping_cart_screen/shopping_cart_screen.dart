@@ -4,6 +4,7 @@ import '../../models/cart_item.dart';
 import 'widgets/empty_cart_widget.dart';
 import 'widgets/order_summary_widget.dart';
 import 'widgets/promo_code_widget.dart';
+import 'widgets/bonus_points_widget.dart';
 
 class ShoppingCartScreen extends StatefulWidget {
   const ShoppingCartScreen({super.key});
@@ -143,6 +144,11 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
                       ..._cartItems.map((item) => _buildCartItem(item)),
                       const SizedBox(height: 24),
                       const PromoCodeWidget(),
+                      const SizedBox(height: 16),
+                      BonusPointsWidget(
+                        totalPrice: _cartService.totalPrice,
+                        onBonusUsed: _loadCart,
+                      ),
                       const SizedBox(height: 24),
                       OrderSummaryWidget(
                         totalPrice: _cartService.totalPrice,
@@ -159,7 +165,7 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
               padding: const EdgeInsets.all(16),
               child: ElevatedButton(
                 onPressed: () {
-                  // TODO: implement checkout
+                  Navigator.pushNamed(context, '/checkout-screen');
                 },
                 child: const Text('Оформить заказ'),
               ),

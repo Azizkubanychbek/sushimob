@@ -58,10 +58,21 @@ class CartService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['cart'] != null) {
-          _cartItems = (data['cart'] as List)
-              .map((json) => CartItem.fromJson(json))
-              .toList();
-          print('✅ Корзина загружена: ${_cartItems.length} товаров');
+          try {
+            _cartItems = (data['cart'] as List)
+                .map((json) {
+                  // Проверяем, что json не null и содержит необходимые поля
+                  if (json == null) return null;
+                  return CartItem.fromJson(json);
+                })
+                .where((item) => item != null) // Убираем null элементы
+                .cast<CartItem>()
+                .toList();
+            print('✅ Корзина загружена: ${_cartItems.length} товаров');
+          } catch (e) {
+            print('❌ Ошибка парсинга корзины: $e');
+            _cartItems = [];
+          }
         } else {
           print('❌ API вернул ошибку: ${data['error'] ?? 'Неизвестная ошибка'}');
           _cartItems = [];
@@ -242,5 +253,56 @@ class CartService {
       ),
     );
     return item.quantity;
+  }
+
+  // Использование бонусных баллов
+  Future<Map<String, dynamic>> useBonusPoints(int bonusPoints) async {
+    try {
+      final authService = AuthService();
+      if (!authService.isLoggedIn) {
+        return {
+          'success': false,
+          'error': 'Необходимо войти в систему',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/cart/use-bonus'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer ${authService.sessionToken}',
+        },
+        body: jsonEncode({
+          'bonus_points': bonusPoints,
+        }),
+      );
+
+      final jsonData = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('✅ Бонусные баллы успешно использованы');
+        // Перезагружаем корзину после использования бонусов
+        await loadCart();
+        return {
+          'success': true,
+          'message': jsonData['message'],
+          'bonus_points_used': jsonData['bonus_points_used'],
+          'remaining_bonus_points': jsonData['remaining_bonus_points'],
+          'discount_applied': jsonData['discount_applied'],
+        };
+      } else {
+        print('❌ Ошибка использования бонусных баллов: ${jsonData['error']}');
+        return {
+          'success': false,
+          'error': jsonData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ Ошибка сети при использовании бонусных баллов: $e');
+      return {
+        'success': false,
+        'error': 'Ошибка сети: $e',
+      };
+    }
   }
 }

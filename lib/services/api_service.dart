@@ -268,20 +268,22 @@ class ApiService {
 
   // Заказы
   static Future<Map<String, dynamic>> createOrder({
-    required List<Map<String, dynamic>> items,
     required double totalAmount,
     required String deliveryAddress,
-    String? deliveryTime,
+    required String phone,
+    String paymentMethod = 'cash',
+    String? comment,
   }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/orders'),
         headers: _headers,
         body: jsonEncode({
-          'items': items,
           'total_amount': totalAmount,
           'delivery_address': deliveryAddress,
-          'delivery_time': deliveryTime,
+          'phone': phone,
+          'payment_method': paymentMethod,
+          'comment': comment ?? '',
         }),
       );
 
@@ -712,6 +714,91 @@ class ApiService {
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Ошибка обновления состава сета');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // ===== API для накопительных карт =====
+  
+  // Получение накопительных карт пользователя
+  static Future<Map<String, dynamic>> getLoyaltyCards() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/loyalty/cards'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения накопительных карт');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Получение доступных роллов для накопительной системы
+  static Future<Map<String, dynamic>> getAvailableLoyaltyRolls() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/loyalty/available-rolls'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения доступных роллов');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Использование накопительной карты
+  static Future<Map<String, dynamic>> useLoyaltyCard({
+    required int cardId,
+    required int rollId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/loyalty/use-card'),
+        headers: _headers,
+        body: jsonEncode({
+          'card_id': cardId,
+          'roll_id': rollId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка использования накопительной карты');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Получение истории использования накопительных карт
+  static Future<Map<String, dynamic>> getLoyaltyHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/loyalty/history'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения истории');
       }
     } catch (e) {
       throw Exception('Ошибка сети: $e');
