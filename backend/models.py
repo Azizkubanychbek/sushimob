@@ -232,11 +232,33 @@ class OrderItem(db.Model):
     order = db.relationship('Order', back_populates='items')
 
     def to_dict(self):
+        # Получаем название товара
+        item_name = 'Товар'
+        item_image = ''
+        
+        if self.item_type == 'roll':
+            roll = Roll.query.get(self.item_id)
+            if roll:
+                item_name = roll.name
+                item_image = roll.image_url or ''
+        elif self.item_type == 'set':
+            set_item = Set.query.get(self.item_id)
+            if set_item:
+                item_name = set_item.name
+                item_image = set_item.image_url or ''
+        elif self.item_type == 'other_item':
+            other_item = OtherItem.query.get(self.item_id)
+            if other_item:
+                item_name = other_item.name
+                item_image = other_item.image_url or ''
+        
         return {
             'id': self.id,
             'order_id': self.order_id,
             'item_type': self.item_type,
             'item_id': self.item_id,
+            'item_name': item_name,
+            'item_image': item_image,
             'quantity': self.quantity,
             'unit_price': self.unit_price,
             'total_price': self.total_price

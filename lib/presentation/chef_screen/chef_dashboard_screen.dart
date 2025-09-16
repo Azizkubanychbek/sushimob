@@ -23,7 +23,7 @@ class _ChefDashboardScreenState extends State<ChefDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _loadOrders();
   }
 
@@ -137,6 +137,8 @@ class _ChefDashboardScreenState extends State<ChefDashboardScreen>
             Tab(text: 'Новые', icon: Icon(Icons.new_releases)),
             Tab(text: 'Готовятся', icon: Icon(Icons.restaurant)),
             Tab(text: 'Готовы', icon: Icon(Icons.check_circle)),
+            Tab(text: 'Поставки', icon: Icon(Icons.local_shipping)),
+            Tab(text: 'Списания', icon: Icon(Icons.remove_circle)),
             Tab(text: 'Все', icon: Icon(Icons.list)),
           ],
         ),
@@ -146,10 +148,12 @@ class _ChefDashboardScreenState extends State<ChefDashboardScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildOrdersList(_getOrdersByStatus([OrderStatus.pending])),
-                _buildOrdersList(_getOrdersByStatus([OrderStatus.confirmed, OrderStatus.preparing])),
-                _buildOrdersList(_getOrdersByStatus([OrderStatus.ready])),
-                _buildOrdersList(_orders),
+                _buildOrdersList(_getOrdersByStatus([OrderStatus.confirmed])), // Новые заказы (Принят)
+                _buildOrdersList(_getOrdersByStatus([OrderStatus.preparing])), // Готовятся
+                _buildOrdersList(_getOrdersByStatus([OrderStatus.ready])), // Готовы
+                _buildSuppliesList(), // Поставки
+                _buildWriteoffsList(), // Списания
+                _buildOrdersList(_orders), // Все заказы
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
@@ -342,7 +346,7 @@ class _ChefDashboardScreenState extends State<ChefDashboardScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Сумма: ${order.totalAmount.toStringAsFixed(0)}₽',
+                  'Сумма: ${order.totalAmount.toStringAsFixed(0)} сом',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -606,6 +610,243 @@ class _ChefDashboardScreenState extends State<ChefDashboardScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSuppliesList() {
+    return Scaffold(
+      body: Column(
+        children: [
+          // Кнопка добавления поставки
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            child: ElevatedButton.icon(
+              onPressed: () => _showAddSupplyDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить поставку'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          // Список поставок
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 5, // Заглушка
+              itemBuilder: (context, index) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.local_shipping, color: Colors.green),
+                    title: Text('Поставка #${index + 1}'),
+                    subtitle: Text('Рис - 50 кг\n${_formatDate(DateTime.now().subtract(Duration(days: index)))}'),
+                    trailing: Text('${(100 + index * 50)} сом'),
+                    onTap: () => _showSupplyDetails(index + 1),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWriteoffsList() {
+    return Scaffold(
+      body: Column(
+        children: [
+          // Кнопка добавления списания
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            child: ElevatedButton.icon(
+              onPressed: () => _showAddWriteoffDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить списание'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          // Список списаний
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 3, // Заглушка
+              itemBuilder: (context, index) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.remove_circle, color: Colors.red),
+                    title: Text('Списание #${index + 1}'),
+                    subtitle: Text('Просроченный лосось - 2 кг\n${_formatDate(DateTime.now().subtract(Duration(days: index + 1)))}'),
+                    trailing: Text('${(50 + index * 25)} сом'),
+                    onTap: () => _showWriteoffDetails(index + 1),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddSupplyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Добавить поставку'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'Название ингредиента'),
+              controller: TextEditingController(text: 'Рис'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Количество'),
+              controller: TextEditingController(text: '50'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Единица измерения'),
+              controller: TextEditingController(text: 'кг'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Стоимость'),
+              controller: TextEditingController(text: '150'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Поставка добавлена')),
+              );
+            },
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddWriteoffDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Добавить списание'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'Название ингредиента'),
+              controller: TextEditingController(text: 'Лосось'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Количество'),
+              controller: TextEditingController(text: '2'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Единица измерения'),
+              controller: TextEditingController(text: 'кг'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Причина списания'),
+              controller: TextEditingController(text: 'Просрочен'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Списание добавлено')),
+              );
+            },
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSupplyDetails(int supplyId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Поставка #$supplyId'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ингредиент: Рис'),
+            Text('Количество: 50 кг'),
+            Text('Стоимость: 150 сом'),
+            Text('Дата: ${_formatDate(DateTime.now())}'),
+            Text('Поставщик: ООО "Рис и Ко"'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWriteoffDetails(int writeoffId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Списание #$writeoffId'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ингредиент: Лосось'),
+            Text('Количество: 2 кг'),
+            Text('Причина: Просрочен'),
+            Text('Дата: ${_formatDate(DateTime.now())}'),
+            Text('Ответственный: Шеф-повар'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрыть'),
+          ),
+        ],
       ),
     );
   }
