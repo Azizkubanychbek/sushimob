@@ -273,7 +273,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
                         labelText: 'Телефон',
-                        hintText: 'Введите ваш телефон',
+                        hintText: '+996 (555) 123-456',
                         prefixIcon: Icon(Icons.phone_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.all(Radius.circular(12)),

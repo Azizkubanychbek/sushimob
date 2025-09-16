@@ -4,9 +4,10 @@ import '../models/roll.dart';
 import '../models/set.dart';
 import '../models/user.dart';
 import '../models/cart_item.dart';
+import '../models/order.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:5000/api';
+  static const String baseUrl = 'http://127.0.0.1:5002/api';
   static String? _authToken;
 
   static void setAuthToken(String token) {
@@ -799,6 +800,109 @@ class ApiService {
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Ошибка получения истории');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Получение списка заказов пользователя (обновленная версия)
+  static Future<List<Order>> getOrdersList() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/orders'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final orders = (data['orders'] as List<dynamic>?)
+            ?.map((order) => Order.fromJson(order))
+            .toList() ?? [];
+        return orders;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения заказов');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Создание нового заказа (обновленная версия)
+  static Future<Order> createNewOrder({
+    required String deliveryAddress,
+    required String deliveryPhone,
+    required String paymentMethod,
+    String? notes,
+    List<Map<String, dynamic>>? items,
+  }) async {
+    try {
+      // Получаем данные корзины если items не переданы
+      List<Map<String, dynamic>> orderItems = items ?? [];
+      
+      if (orderItems.isEmpty) {
+        // Получаем корзину пользователя
+        final cart = await getCart();
+        orderItems = cart.map((cartItem) {
+          // Безопасно получаем ID товара
+          dynamic itemId;
+          if (cartItem.item is Map) {
+            itemId = cartItem.item['id'];
+          } else if (cartItem.item != null) {
+            itemId = cartItem.item.id;
+          } else {
+            // Если item равен null, используем ID из cartItem
+            itemId = cartItem.id;
+          }
+          
+          return {
+            'item_type': cartItem.itemType,
+            'item_id': itemId,
+            'quantity': cartItem.quantity,
+            'price': cartItem.price / cartItem.quantity,
+          };
+        }).toList();
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders'),
+        headers: _headers,
+        body: jsonEncode({
+          'delivery_address': deliveryAddress,
+          'phone': deliveryPhone,
+          'payment_method': paymentMethod,
+          'comment': notes,
+          'items': orderItems,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return Order.fromJson(data['order']);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка создания заказа');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  // Получение деталей заказа по ID
+  static Future<Order> getOrderById(int orderId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/orders/$orderId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Order.fromJson(data['order']);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Ошибка получения заказа');
       }
     } catch (e) {
       throw Exception('Ошибка сети: $e');

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../../services/cart_service.dart';
 import '../../services/api_service.dart';
 import '../../models/cart_item.dart';
+import '../address_selection_screen/interactive_map_screen.dart';
+import '../address_selection_screen/universal_2gis_map_screen.dart';
+import '../../services/maps_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -12,6 +16,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final CartService _cartService = CartService();
+  final MapsService _mapsService = MapsService();
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
@@ -19,6 +24,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   
   String _paymentMethod = 'cash';
   bool _isLoading = false;
+  AddressInfo? _selectedAddressInfo;
 
   @override
   void initState() {
@@ -29,6 +35,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void _loadCartData() {
     // Загружаем данные из корзины
     setState(() {});
+  }
+
+  Future<void> _selectAddressOnMap() async {
+    final currentLocation = _selectedAddressInfo?.coordinates ?? 
+        const LatLng(42.8746, 74.5698); // Центр Бишкека по умолчанию
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Universal2GisMapScreen(
+          initialCenter: currentLocation,
+          onLocationSelected: (coordinates, address) {
+            setState(() {
+              _selectedAddressInfo = AddressInfo(
+                coordinates: coordinates,
+                address: address,
+                distance: MapsService.getDistance(
+                  RestaurantLocation.coordinates, 
+                  coordinates
+                ),
+              );
+              _addressController.text = address;
+            });
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -55,8 +87,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           itemId = 'bonus';
         } else if (cartItem.item is Map<String, dynamic>) {
           itemId = cartItem.item['id'];
-        } else {
+        } else if (cartItem.item != null) {
           itemId = cartItem.item.id;
+        } else {
+          // Если item равен null, используем ID из cartItem
+          itemId = cartItem.id;
         }
         
         return {
@@ -69,23 +104,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }).toList();
 
       // Создаем заказ через API
-      final result = await ApiService.createOrder(
-        totalAmount: _cartService.totalPrice + 200, // + доставка
+      final result = await ApiService.createNewOrder(
         deliveryAddress: _addressController.text.trim(),
-        phone: _phoneController.text.trim(),
+        deliveryPhone: _phoneController.text.trim(),
         paymentMethod: _paymentMethod,
-        comment: _commentController.text.trim(),
+        notes: _commentController.text.trim().isEmpty ? null : _commentController.text.trim(),
       );
 
-      if (result['success'] == true) {
-        // Очищаем корзину после успешного заказа
-        await _cartService.clearCart();
-        
-        // Показываем успешное сообщение
-        _showSuccessDialog();
-      } else {
-        _showErrorDialog(result['error'] ?? 'Ошибка создания заказа');
-      }
+      // Заказ успешно создан
+      // Очищаем корзину после успешного заказа
+      await _cartService.clearCart();
+      
+      // Показываем успешное сообщение
+      _showSuccessDialog(result.id);
     } catch (e) {
       _showErrorDialog('Ошибка сети: $e');
     } finally {
@@ -97,7 +128,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(int orderId) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -109,7 +140,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Text('Заказ оформлен!'),
           ],
         ),
-        content: const Text('Ваш заказ успешно создан. Мы свяжемся с вами в ближайшее время.'),
+        content: Text('Ваш заказ #$orderId успешно создан. Мы свяжемся с вами в ближайшее время.'),
         actions: [
           TextButton(
             onPressed: () {
@@ -183,7 +214,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   Expanded(
                                     child: Text('${item.itemName} x${item.quantity}'),
                                   ),
-                                  Text('${item.price.toStringAsFixed(2)} ₽'),
+                                  Text('${item.price.toStringAsFixed(2)} сом'),
                                 ],
                               ),
                             )),
@@ -192,7 +223,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text('Стоимость товаров:'),
-                                Text('${_cartService.totalPrice.toStringAsFixed(2)} ₽'),
+                                Text('${_cartService.totalPrice.toStringAsFixed(2)} сом'),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -200,7 +231,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text('Доставка:'),
-                                Text('200 ₽'),
+                                Text('200 сом'),
                               ],
                             ),
                             const Divider(),
@@ -214,7 +245,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${(_cartService.totalPrice + 200).toStringAsFixed(2)} ₽',
+                                  '${(_cartService.totalPrice + 200).toStringAsFixed(2)} сом',
                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: Theme.of(context).primaryColor,
@@ -246,7 +277,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               controller: _phoneController,
                               decoration: const InputDecoration(
                                 labelText: 'Телефон для связи *',
-                                hintText: '+7 (999) 123-45-67',
+                                hintText: '+996 (555) 123-456',
                                 border: OutlineInputBorder(),
                               ),
                               keyboardType: TextInputType.phone,
@@ -260,10 +291,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _addressController,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Адрес доставки *',
-                                hintText: 'ул. Примерная, д. 1, кв. 1',
-                                border: OutlineInputBorder(),
+                                hintText: 'ул. Чуй, д. 123, кв. 45, Бишкек',
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  onPressed: _selectAddressOnMap,
+                                  icon: const Icon(Icons.map),
+                                  tooltip: 'Выбрать на карте',
+                                ),
                               ),
                               maxLines: 2,
                               validator: (value) {
@@ -272,6 +308,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 }
                                 return null;
                               },
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Нажмите на иконку карты для выбора адреса на карте',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 16),
                             TextFormField(

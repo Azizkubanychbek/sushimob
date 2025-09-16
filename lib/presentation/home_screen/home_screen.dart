@@ -831,7 +831,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    '${item.price.toStringAsFixed(2)} ₽',
+                                    '${item.price.toStringAsFixed(2)} сом',
                                     style: AppTheme.lightTheme.textTheme.titleSmall?.copyWith(
                                       color: AppTheme.lightTheme.colorScheme.primary,
                                       fontWeight: FontWeight.bold,
@@ -1148,7 +1148,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               _buildNavItem(0, Icons.home, 'Home'),
               _buildNavItem(1, Icons.restaurant_menu, 'Menu'),
-              _buildNavItem(2, Icons.favorite, 'Favorites'),
+              _buildNavItem(2, Icons.receipt_long, 'Заказы'),
               _buildNavItem(3, Icons.shopping_cart, 'Cart'),
               _buildNavItem(4, Icons.person, 'Profile'),
             ],
@@ -1174,7 +1174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Navigator.pushReplacementNamed(context, '/menu-browse-screen');
             break;
           case 2:
-            Navigator.pushReplacementNamed(context, '/favorites-screen');
+            Navigator.pushReplacementNamed(context, '/orders-screen');
             break;
           case 3:
             Navigator.pushReplacementNamed(context, '/shopping-cart-screen');

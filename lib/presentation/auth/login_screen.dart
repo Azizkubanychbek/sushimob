@@ -89,6 +89,130 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushNamed(context, '/register-screen');
   }
 
+  void _showChefLoginDialog() {
+    final chefEmailController = TextEditingController(text: 'chef@sushiroll.com');
+    final chefPasswordController = TextEditingController(text: 'chef123');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.restaurant_menu, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Панель шеф-повара'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: chefEmailController,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
+              enabled: false, // Показываем, но не даем редактировать
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: chefPasswordController,
+              decoration: const InputDecoration(
+                labelText: 'Пароль',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              enabled: false, // Показываем, но не даем редактировать
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Демо-данные:\nEmail: chef@sushiroll.com\nПароль: chef123',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _loginAsChef();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Войти как шеф-повар'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _loginAsChef() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await _authService.login(
+        email: 'chef@sushiroll.com',
+        password: 'chef123',
+      );
+
+      if (!mounted) return;
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Добро пожаловать, шеф-повар!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Переходим в панель шеф-повара
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context, 
+            '/chef-dashboard-screen', 
+            (route) => false
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? 'Ошибка входа'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Произошла ошибка. Попробуйте позже.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -371,6 +495,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Chef Login Button
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.restaurant_menu,
+                    color: Colors.orange,
+                  ),
+                  title: const Text(
+                    'Панель шеф-повара',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Вход для персонала',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    _showChefLoginDialog();
+                  },
+                ),
               ),
             ],
           ),

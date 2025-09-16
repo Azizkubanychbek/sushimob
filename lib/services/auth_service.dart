@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import '../models/user.dart';
 import 'api_user_service.dart';
 import 'api_service.dart';
+import 'order_service.dart';
 
 class AuthResult {
   final bool success;
@@ -31,6 +32,7 @@ class AuthService {
   User? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
   String? get sessionToken => _currentSessionToken;
+  String? getToken() => _currentSessionToken;
 
   Future<void> initialize() async {
     print('🔐 Инициализация AuthService...');
@@ -182,6 +184,10 @@ class AuthService {
       
       // Устанавливаем токен в ApiService для админ API
       ApiService.setAuthToken(accessToken);
+      
+      // Устанавливаем токен в OrderService
+      final orderService = OrderService();
+      orderService.setAuthToken(accessToken);
 
       print('✅ Сессия создана для ${user.name} через API');
       print('👤 Текущий пользователь: ${_currentUser?.name}');

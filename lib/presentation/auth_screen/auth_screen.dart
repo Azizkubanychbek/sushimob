@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import '../../models/user.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -42,13 +43,18 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       if (_isLogin) {
         // Вход
-        final response = await ApiService.login(
+        final authService = AuthService();
+        final result = await authService.login(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
         
-        if (mounted) {
+        if (result.success && mounted) {
           Navigator.pushReplacementNamed(context, '/home-screen');
+        } else {
+          setState(() {
+            _errorMessage = result.message;
+          });
         }
       } else {
         // Регистрация

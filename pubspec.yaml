@@ -25,6 +25,14 @@ dependencies:
   sqflite_common_ffi_web: ^0.4.2
   crypto: ^3.0.3
   web: any
+  # Maps integration
+  geolocator: ^10.1.0
+  geocoding: ^2.1.1
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  webview_flutter: ^4.4.2
+  # 2GIS SDK для мобильных платформ (только для Android/iOS)
+  # dgis_mobile_sdk_map: ^12.8.0  # Временно отключено из-за Web конфликтов
 dev_dependencies: 
   flutter_test: 
     sdk: flutter
@@ -36,3 +44,4 @@ flutter:
     - assets/images/
     - assets/data/
     - assets/data/users.json
+    - assets/icons/

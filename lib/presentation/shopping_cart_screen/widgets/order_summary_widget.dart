@@ -33,7 +33,7 @@ class OrderSummaryWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Стоимость товаров (${totalItems} шт.):'),
-              Text('${totalPrice.toStringAsFixed(2)} ₽'),
+              Text('${totalPrice.toStringAsFixed(2)} сом'),
             ],
           ),
           SizedBox(height: 8),
@@ -41,7 +41,7 @@ class OrderSummaryWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Доставка:'),
-              Text('200 ₽'),
+              Text('200 сом'),
             ],
           ),
           SizedBox(height: 8),
@@ -49,7 +49,7 @@ class OrderSummaryWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Скидка:'),
-              Text('-50 ₽', style: TextStyle(color: Colors.green)),
+              Text('-50 сом', style: TextStyle(color: Colors.green)),
             ],
           ),
           Divider(height: 24),
@@ -64,7 +64,7 @@ class OrderSummaryWidget extends StatelessWidget {
                 ),
               ),
               Text(
-                '${totalPrice.toStringAsFixed(2)} ₽',
+                '${totalPrice.toStringAsFixed(2)} сом',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

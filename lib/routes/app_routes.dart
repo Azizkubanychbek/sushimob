@@ -16,6 +16,11 @@ import '../presentation/admin_screen/admin_screen.dart';
 import '../presentation/checkout_screen/checkout_screen.dart';
 import '../presentation/loyalty_screen/loyalty_screen.dart';
 import '../presentation/referral_screen/referral_screen.dart';
+import '../presentation/address_selection_screen/interactive_map_screen.dart';
+import '../presentation/address_selection_screen/universal_2gis_map_screen.dart';
+import '../presentation/orders_screen/orders_screen.dart';
+import '../presentation/chef_screen/chef_dashboard_screen.dart';
+import 'package:latlong2/latlong.dart';
 
 class AppRoutes {
   // TODO: Add your routes here
@@ -37,6 +42,10 @@ class AppRoutes {
   static const String checkoutScreen = '/checkout-screen';
   static const String loyaltyScreen = '/loyalty-screen';
   static const String referralScreen = '/referral-screen';
+  static const String interactiveMapScreen = '/interactive-map-screen';
+  static const String twogisMapScreen = '/twogis-map-screen';
+  static const String ordersScreen = '/orders-screen';
+  static const String chefDashboardScreen = '/chef-dashboard-screen';
 
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const HomeScreen(),
@@ -57,6 +66,19 @@ class AppRoutes {
     checkoutScreen: (context) => const CheckoutScreen(),
     loyaltyScreen: (context) => const LoyaltyScreen(),
     referralScreen: (context) => const ReferralScreen(),
+    interactiveMapScreen: (context) => InteractiveMapScreen(
+      onAddressSelected: (addressInfo) {
+        Navigator.of(context).pop(addressInfo);
+      },
+    ),
+    twogisMapScreen: (context) => Universal2GisMapScreen(
+      initialCenter: const LatLng(42.8746, 74.5698), // Центр Бишкека
+      onLocationSelected: (coordinates, address) {
+        Navigator.of(context).pop();
+      },
+    ),
+    ordersScreen: (context) => const OrdersScreen(),
+    chefDashboardScreen: (context) => const ChefDashboardScreen(),
     // TODO: Add your other routes here
   };
 }

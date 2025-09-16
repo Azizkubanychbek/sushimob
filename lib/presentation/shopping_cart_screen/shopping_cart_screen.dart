@@ -41,6 +41,50 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
 
   bool get isEmpty => _cartItems.isEmpty;
 
+  Widget _buildItemImage(CartItem item) {
+    String? imageUrl;
+    
+    // Получаем URL изображения из item
+    if (item.item is Map<String, dynamic>) {
+      imageUrl = item.item['image_url'];
+    } else if (item.itemType == 'roll' && item.item != null) {
+      imageUrl = (item.item as dynamic).imageUrl;
+    } else if (item.itemType == 'set' && item.item != null) {
+      imageUrl = (item.item as dynamic).imageUrl;
+    }
+    
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          imageUrl,
+          width: 80,
+          height: 80,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildFallbackIcon(item);
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          },
+        ),
+      );
+    }
+    
+    return _buildFallbackIcon(item);
+  }
+
+  Widget _buildFallbackIcon(CartItem item) {
+    return Icon(
+      item.itemType == 'roll' ? Icons.restaurant : Icons.set_meal,
+      size: 40,
+      color: Colors.grey,
+    );
+  }
+
   Widget _buildCartItem(CartItem item) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -56,9 +100,7 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
                 borderRadius: BorderRadius.circular(8),
                 color: Colors.grey[200],
               ),
-              child: item.itemType == 'roll' 
-                  ? const Icon(Icons.restaurant, size: 40, color: Colors.grey)
-                  : const Icon(Icons.set_meal, size: 40, color: Colors.grey),
+              child: _buildItemImage(item),
             ),
             const SizedBox(width: 16),
             
@@ -75,7 +117,7 @@ class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${item.price.toStringAsFixed(2)} ₽',
+                    '${item.price.toStringAsFixed(2)} сом',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.bold,
